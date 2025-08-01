@@ -1,0 +1,3252 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NeuroLaunch — Ship LLM Updates with Confidence</title>
+  <meta name="description" content="NeuroLaunch evaluates prompts, catches regressions, and rolls out safely so your AI features get better every week." />
+
+  <!-- Fonts + Tailwind -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    /* =======================
+       Tailwind & Brand Tokens
+       ======================= */
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: "#0A0B0D",        // page background
+            panel: "#0F1116",     // cards/panels
+            edge: "#141A22",      // borders
+            ink: "#E8ECF7",       // main text
+            sub: "#A9B2C7",       // secondary text
+            brand: {
+              DEFAULT: "#5A7CFF", // main brand accent
+              soft: "#9CB1FF",    // softer accent
+              glow: "#C8D5FF",    // glow
+            },
+            success: "#22C55E",
+          },
+          fontFamily: {
+            sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+            mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
+          },
+          boxShadow: {
+            glass: "0 1px 0 0 rgba(255,255,255,0.03), 0 8px 30px rgba(0,0,0,.35)",
+            glow: "0 0 0 1px rgba(90,124,255,0.25), 0 10px 40px rgba(90,124,255,0.25)",
+          },
+          keyframes: {
+            float: { "0%,100%": { transform: "translateY(0)" }, "50%": { transform: "translateY(-6px)" } },
+            fadeUp: { "0%": { opacity: 0, transform: "translateY(14px)" }, "100%": { opacity: 1, transform: "translateY(0)" } },
+            fadeIn: { "0%": { opacity: 0 }, "100%": { opacity: 1 } },
+            shimmer: { "0%": { transform: "translateX(-100%)" }, "100%": { transform: "translateX(100%)" } }
+          },
+          animation: {
+            float: "float 6s ease-in-out infinite",
+            fadeUp: "fadeUp .7s ease both",
+            fadeUpSlow: "fadeUp 1s ease both .1s",
+            fadeIn: "fadeIn .6s ease both",
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Premium background radials & grid */
+    .radial-bg {
+      background:
+        radial-gradient(1000px 500px at 80% -20%, rgba(90,124,255,.18), transparent 60%),
+        radial-gradient(800px 400px at 5% 0%, rgba(255,255,255,.06), transparent 60%);
+    }
+    .glass { backdrop-filter: saturate(160%) blur(10px); }
+    .code-tab-active { border-color: #5A7CFF; color: #C8D5FF; }
+    .code-tab { border-color: transparent; color: #A9B2C7; }
+    .token-kw { color:#C8D5FF }
+    .token-fn { color:#86E7FF }
+    .token-str { color:#86EFAC }
+    .token-num { color:#FDE68A }
+    .token-cm { color:#94A3B8 }
+    /* Parallax */
+    .parallax-glow { will-change: transform; transition: transform .08s linear; }
+    /* Underline hover */
+    .link-underline {
+      position: relative;
+    }
+    .link-underline::after {
+      content: "";
+      position: absolute;
+      left: 0; bottom: -6px; height: 2px; width: 0;
+      background: linear-gradient(90deg, #9CB1FF, #5A7CFF);
+      transition: width .25s ease;
+    }
+    .link-underline:hover::after { width: 100%; }
+    /* Smooth anchor offset for sticky header */
+    :target::before {
+      content: "";
+      display: block;
+      height: 76px;         /* header height space */
+      margin-top: -76px;
+      visibility: hidden;
+    }
+  </style>
+</head>
+
+<body class="bg-bg text-ink font-sans antialiased radial-bg">
+  <!-- ================= Header ================= -->
+  <header id="top" class="sticky top-0 z-50 border-b border-white/10 bg-bg/70 glass">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <!-- Brand -->
+      <a href="#top" class="flex items-center space-x-3 group">
+        <!-- Simple gradient logo (swap later) -->
+        <svg viewBox="0 0 48 48" class="h-9 w-9 drop-shadow-[0_0_12px_rgba(90,124,255,0.35)]">
+          <defs>
+            <linearGradient id="logoG" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#5A7CFF"/>
+              <stop offset="100%" stop-color="#C8D5FF"/>
+            </linearGradient>
+          </defs>
+          <rect x="6" y="6" width="36" height="36" rx="9" fill="url(#logoG)"/>
+          <path d="M24 13c6 0 11 5 11 11s-5 11-11 11-11-5-11-11" stroke="#0A0B0D" stroke-width="3" fill="none" />
+        </svg>
+        <span class="text-xl font-extrabold tracking-tight group-hover:text-brand-soft transition">NeuroLaunch</span>
+      </a>
+
+      <!-- Desktop Nav -->
+      <nav class="hidden lg:flex items-center space-x-8 text-sm">
+        <a href="#features"   class="link-underline hover:text-brand-soft">Features</a>
+        <a href="#integrations" class="link-underline hover:text-brand-soft">Integrations</a>
+        <a href="#pricing"    class="link-underline hover:text-brand-soft">Pricing</a>
+        <a href="#security"   class="link-underline hover:text-brand-soft">Security</a>
+        <a href="#docs"       class="link-underline hover:text-brand-soft">Docs</a>
+        <a href="#changelog"  class="link-underline hover:text-brand-soft">Changelog</a>
+        <a href="#cta" class="ml-2 inline-flex items-center rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 shadow-glow font-semibold">Get API Key</a>
+      </nav>
+
+      <!-- Mobile Menu Button -->
+      <button id="mobBtn" class="lg:hidden inline-flex items-center justify-center rounded-lg p-2 hover:bg-white/10" aria-label="Open menu">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
+      </button>
+    </div>
+
+    <!-- Mobile Nav -->
+    <div id="mobMenu" class="lg:hidden hidden border-t border-white/10">
+      <div class="px-6 py-4 space-y-3 text-sm">
+        <a href="#features"   class="block hover:text-brand-soft">Features</a>
+        <a href="#integrations" class="block hover:text-brand-soft">Integrations</a>
+        <a href="#pricing"    class="block hover:text-brand-soft">Pricing</a>
+        <a href="#security"   class="block hover:text-brand-soft">Security</a>
+        <a href="#docs"       class="block hover:text-brand-soft">Docs</a>
+        <a href="#changelog"  class="block hover:text-brand-soft">Changelog</a>
+        <a href="#cta" class="block rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 text-center font-semibold">Get API Key</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= Hero ================= -->
+  <section id="hero" class="relative overflow-hidden">
+    <!-- Subtle grid overlay -->
+    <div class="pointer-events-none absolute inset-0 opacity-[0.07]" aria-hidden="true"
+      style="background-image: linear-gradient(to right, rgba(255,255,255,.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.2) 1px, transparent 1px); background-size: 36px 36px;"></div>
+
+    <!-- Parallax Glow -->
+    <div id="parallax" class="parallax-glow absolute -top-24 right-0 w-[600px] h-[600px] rounded-full blur-3xl opacity-40"
+         style="background: radial-gradient(closest-side, rgba(90,124,255,.45), rgba(90,124,255,.15), transparent 70%);"></div>
+
+    <div class="max-w-7xl mx-auto px-6 pt-16 md:pt-24 pb-20 md:pb-28 grid md:grid-cols-2 gap-12">
+      <!-- Left Copy -->
+      <div class="self-center animate-fadeUp">
+        <div class="inline-flex items-center text-xs text-sub border border-white/10 rounded-full px-3 py-1 mb-5 bg-panel/60 glass">
+          <span class="mr-2 inline-block h-2 w-2 rounded-full bg-success"></span> New: Guarded rollouts & automatic rollback
+        </div>
+
+        <h1 class="text-4xl md:text-6xl font-extrabold leading-tight">
+          Ship LLM updates <span class="text-brand-soft">with confidence.</span>
+        </h1>
+
+        <p class="mt-5 text-lg text-sub max-w-xl">
+          Evaluate prompts on golden datasets, A/B in production, and release with guardrails—so your AI features get better every week, not riskier.
+        </p>
+
+        <div class="mt-8 flex flex-wrap items-center gap-4">
+          <a href="#cta" class="inline-flex items-center rounded-2xl px-6 py-3 bg-brand hover:bg-brand/90 font-semibold shadow-glow">
+            Start Free
+          </a>
+          <a href="#docs" class="inline-flex items-center rounded-2xl px-6 py-3 bg-white/10 hover:bg-white/15 border border-white/10 font-semibold">
+            Read Docs
+          </a>
+          <div class="text-sm text-sub">No credit card • SOC2 Type II</div>
+        </div>
+
+        <!-- Micro-proof ribbon -->
+        <div class="mt-8 flex items-center gap-6 text-sm text-sub animate-fadeUpSlow">
+          <div class="flex items-center gap-2"><span>⭐</span> <span>1.2k GitHub Stars</span></div>
+          <div class="h-4 w-px bg-white/10"></div>
+          <div>Trusted by HelioCRM, VectorForge, CoParse</div>
+        </div>
+      </div>
+
+      <!-- Right: Animated Tabbed Code -->
+      <div class="relative">
+        <div class="absolute -inset-1 rounded-3xl bg-gradient-to-b from-brand/20 to-transparent blur-2xl"></div>
+        <div class="relative bg-panel border border-white/10 rounded-3xl p-5 shadow-2xl animate-fadeIn">
+          <!-- window controls -->
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="h-3 w-3 rounded-full bg-[#F87171]"></span>
+              <span class="h-3 w-3 rounded-full bg-[#FBBF24]"></span>
+              <span class="h-3 w-3 rounded-full bg-[#34D399]"></span>
+            </div>
+            <div class="text-xs text-sub">/examples/eval-and-rollout.py</div>
+          </div>
+
+          <!-- Tabs -->
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex gap-2 text-xs">
+              <button data-tab="py"   class="code-tab-active border-b-2 px-3 py-1 rounded-t-md">Python</button>
+              <button data-tab="js"   class="code-tab        border-b-2 px-3 py-1 rounded-t-md hover:text-ink">JavaScript</button>
+              <button data-tab="curl" class="code-tab        border-b-2 px-3 py-1 rounded-t-md hover:text-ink">cURL</button>
+            </div>
+            <button id="copyCode" class="text-xs text-sub hover:text-ink inline-flex items-center gap-2 px-3 py-1 border border-white/10 rounded-md">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor"><rect x="9" y="9" width="10" height="10" rx="2" stroke-width="2"/><path d="M7 13V7a2 2 0 0 1 2-2h6" stroke-width="2"/></svg>
+              Copy
+            </button>
+          </div>
+
+          <!-- Code panes (typewriter reveal on load) -->
+          <pre id="code_py"   class="block  font-mono text-sm leading-relaxed bg-black/40 rounded-2xl p-4 overflow-x-auto text-ink/90 whitespace-pre-wrap"></pre>
+          <pre id="code_js"   class="hidden font-mono text-sm leading-relaxed bg-black/40 rounded-2xl p-4 overflow-x-auto text-ink/90 whitespace-pre-wrap"></pre>
+          <pre id="code_curl" class="hidden font-mono text-sm leading-relaxed bg-black/40 rounded-2xl p-4 overflow-x-auto text-ink/90 whitespace-pre-wrap"></pre>
+        </div>
+
+        <!-- Floating glow -->
+        <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 w-[70%] h-24 bg-brand/20 blur-3xl rounded-full opacity-40 animate-float"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== Tiny Section Stubs so Links Work (we’ll replace later) ============== -->
+<!-- ======================= SECTION 2: FEATURES ======================= -->
+<section id="features" class="relative py-24 md:py-28 overflow-hidden">
+  <!-- Ambient gradients -->
+  <div aria-hidden="true" class="pointer-events-none absolute -top-20 -right-20 w-[520px] h-[520px] rounded-full blur-3xl opacity-25"
+       style="background: radial-gradient(closest-side, rgba(90,124,255,.35), rgba(90,124,255,.12), transparent 70%);"></div>
+  <div aria-hidden="true" class="pointer-events-none absolute -bottom-24 -left-24 w-[560px] h-[560px] rounded-full blur-3xl opacity-20"
+       style="background: radial-gradient(closest-side, rgba(255,255,255,.08), rgba(255,255,255,.02), transparent 70%);"></div>
+
+  <div class="max-w-7xl mx-auto px-6">
+    <!-- Section header -->
+    <div class="max-w-2xl">
+      <div class="inline-flex items-center text-xs text-sub border border-white/10 rounded-full px-3 py-1 mb-4 bg-panel/60 glass">
+        Features
+      </div>
+      <h2 class="text-3xl md:text-5xl font-extrabold">Evaluate. Test. Release.</h2>
+      <p class="mt-3 text-sub">
+        One workflow to version prompts, run deterministic evals, A/B in production, and ship with guardrails.
+      </p>
+    </div>
+
+    <!-- Feature cards -->
+    <div class="mt-12 grid lg:grid-cols-3 gap-6">
+      <!-- ========== Evaluate Card ========== -->
+      <a id="features-evaluate" href="#features-evaluate"
+         class="feature-card group bg-panel border border-white/10 rounded-3xl p-6 relative will-change-transform"
+         data-tilt>
+        <!-- Glow -->
+        <div aria-hidden="true"
+             class="absolute -inset-0.5 rounded-[26px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(16px);"></div>
+        <div class="relative">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xl font-bold">Evaluate with Confidence</h3>
+            <span class="text-brand-soft font-semibold">01</span>
+          </div>
+          <p class="mt-2 text-sub">Golden datasets, human ratings, custom metrics, and full traceability.</p>
+          <ul class="mt-4 space-y-2 text-sm text-ink/80">
+            <li>• Golden sets & reproducible runs</li>
+            <li>• Custom metrics & pass thresholds</li>
+            <li>• PII redaction & region pinning</li>
+          </ul>
+
+          <!-- Mini demo -->
+          <div class="mt-6 bg-black/30 border border-white/10 rounded-2xl p-4">
+            <div class="flex items-center justify-between text-xs text-sub">
+              <span>Dataset: support_tickets_golden</span>
+              <span>Run #342</span>
+            </div>
+            <div class="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
+              <div class="eval-progress h-2 w-0 bg-brand transition-[width] duration-700"></div>
+            </div>
+            <div class="mt-4 grid grid-cols-4 gap-3 text-center">
+              <div>
+                <div class="text-2xl font-extrabold eval-success">0%</div>
+                <div class="text-[11px] text-sub">Task Success</div>
+              </div>
+              <div>
+                <div class="text-2xl font-extrabold eval-cost">0%</div>
+                <div class="text-[11px] text-sub">Cost ↓</div>
+              </div>
+              <div>
+                <div class="text-2xl font-extrabold eval-latency">0%</div>
+                <div class="text-[11px] text-sub">Latency ↓</div>
+              </div>
+              <div>
+                <div class="text-2xl font-extrabold eval-regress">0</div>
+                <div class="text-[11px] text-sub">Critical Regr.</div>
+              </div>
+            </div>
+            <div class="mt-4 flex justify-end">
+              <button class="btn-run-eval rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold shadow-glow">
+                Run Eval
+              </button>
+            </div>
+          </div>
+        </div>
+      </a>
+
+      <!-- ========== Test Card ========== -->
+      <a id="features-test" href="#features-test"
+         class="feature-card group bg-panel border border-white/10 rounded-3xl p-6 relative will-change-transform"
+         data-tilt>
+        <!-- Glow -->
+        <div aria-hidden="true"
+             class="absolute -inset-0.5 rounded-[26px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(16px);"></div>
+        <div class="relative">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xl font-bold">Test Safely</h3>
+            <span class="text-brand-soft font-semibold">02</span>
+          </div>
+          <p class="mt-2 text-sub">Shadow deploys, A/B in prod, segment rollouts, and auto‑fallback on errors.</p>
+          <ul class="mt-4 space-y-2 text-sm text-ink/80">
+            <li>• A/B tests with live traffic</li>
+            <li>• Segment‑based rollout control</li>
+            <li>• Error budgets & auto‑rollback</li>
+          </ul>
+
+          <!-- Mini demo -->
+          <div class="mt-6 bg-black/30 border border-white/10 rounded-2xl p-4">
+            <div class="text-xs text-sub mb-2">Rollout Control</div>
+            <div class="flex items-center gap-4">
+              <input class="test-slider w-full accent-brand" type="range" min="0" max="100" value="20" />
+              <div class="text-2xl font-extrabold test-value">20%</div>
+            </div>
+            <div class="mt-4 grid grid-cols-3 gap-3">
+              <div class="bg-white/5 rounded-xl p-3">
+                <div class="text-[11px] text-sub">Quality SLO</div>
+                <div class="font-semibold test-slo">≥ 0.85 success</div>
+              </div>
+              <div class="bg-white/5 rounded-xl p-3">
+                <div class="text-[11px] text-sub">Error Budget</div>
+                <div class="font-semibold">≤ 0.3%</div>
+              </div>
+              <div class="bg-white/5 rounded-xl p-3">
+                <div class="text-[11px] text-sub">Status</div>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="h-2.5 w-2.5 rounded-full test-led bg-[#F87171]"></span>
+                  <span class="text-sm test-led-text">Below SLO</span>
+                </div>
+              </div>
+            </div>
+            <div class="mt-4 flex gap-3">
+              <button class="rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold">Roll Out</button>
+              <button class="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/10 font-semibold">Rollback</button>
+            </div>
+          </div>
+        </div>
+      </a>
+
+      <!-- ========== Release Card ========== -->
+      <a id="features-release" href="#features-release"
+         class="feature-card group bg-panel border border-white/10 rounded-3xl p-6 relative will-change-transform"
+         data-tilt>
+        <!-- Glow -->
+        <div aria-hidden="true"
+             class="absolute -inset-0.5 rounded-[26px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(16px);"></div>
+        <div class="relative">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xl font-bold">Release Fast</h3>
+            <span class="text-brand-soft font-semibold">03</span>
+          </div>
+          <p class="mt-2 text-sub">Version every prompt, approvals & changelogs, 1‑click rollbacks, and alerts.</p>
+          <ul class="mt-4 space-y-2 text-sm text-ink/80">
+            <li>• Versioning & approvals</li>
+            <li>• Changelog & audit trail</li>
+            <li>• Slack/Email alerts & webhooks</li>
+          </ul>
+
+          <!-- Mini demo -->
+          <div class="mt-6 bg-black/30 border border-white/10 rounded-2xl p-4">
+            <div class="flex items-center justify-between text-xs text-sub">
+              <span>Release: v19</span>
+              <span>Pending approval</span>
+            </div>
+            <div class="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
+              <div class="release-progress h-2 w-[28%] bg-white/30"></div>
+            </div>
+            <div class="mt-4 flex items-center gap-2 text-sm">
+              <svg class="h-5 w-5 text-white/50 release-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7l-9 9-5-5"/>
+              </svg>
+              <span class="release-text text-sub">Waiting for approvers…</span>
+            </div>
+            <div class="mt-4 flex justify-end gap-3">
+              <button class="btn-approve rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold shadow-glow">Approve Release</button>
+              <button class="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/10 font-semibold">View Changelog</button>
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Bottom micro-CTA row -->
+    <div class="mt-10 flex flex-wrap items-center gap-6 text-sm">
+      <a href="#docs" class="link-underline hover:text-brand-soft">Read the Quickstart</a>
+      <span class="h-4 w-px bg-white/10"></span>
+      <a href="#changelog" class="link-underline hover:text-brand-soft">See what’s new</a>
+    </div>
+  </div>
+
+  <!-- ===== Features scripts (self-contained) ===== -->
+  <script>
+    // Scroll reveal for feature cards
+    (function(){
+      const cards = document.querySelectorAll('#features .feature-card');
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.style.transition = 'transform .6s cubic-bezier(.2,.8,.2,1), opacity .6s ease';
+            e.target.style.opacity = 1;
+            e.target.style.transform = 'translateY(0)';
+            io.unobserve(e.target);
+          }
+        });
+      }, { rootMargin: '0px 0px -10% 0px', threshold: 0.15 });
+      cards.forEach((c,i) => {
+        c.style.opacity = 0;
+        c.style.transform = 'translateY(16px)';
+        c.style.transitionDelay = (i * 80) + 'ms';
+        io.observe(c);
+      });
+    })();
+
+    // 3D tilt effect
+    (function(){
+      const cards = document.querySelectorAll('[data-tilt]');
+      cards.forEach(card => {
+        let rect;
+        const reset = () => {
+          card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateZ(0)';
+        };
+        card.addEventListener('mouseenter', () => { rect = card.getBoundingClientRect(); });
+        card.addEventListener('mousemove', (e) => {
+          const x = e.clientX - rect.left, y = e.clientY - rect.top;
+          const rx = ((y / rect.height) - 0.5) * -6; // rotateX
+          const ry = ((x / rect.width)  - 0.5) *  8; // rotateY
+          card.style.transform = `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(2px)`;
+        });
+        card.addEventListener('mouseleave', () => {
+          card.style.transition = 'transform .25s ease';
+          reset();
+          setTimeout(()=> card.style.transition = '', 260);
+        });
+      });
+    })();
+
+    // Evaluate demo — animate progress & numbers
+    (function(){
+      const root = document.querySelector('#features-evaluate');
+      if (!root) return;
+      const btn   = root.querySelector('.btn-run-eval');
+      const bar   = root.querySelector('.eval-progress');
+      const success = root.querySelector('.eval-success');
+      const cost    = root.querySelector('.eval-cost');
+      const latency = root.querySelector('.eval-latency');
+      const regress = root.querySelector('.eval-regress');
+
+      function countTo(el, target, suffix='', duration=700) {
+        const start = 0; const diff = target - start; const startT = performance.now();
+        function tick(t) {
+          const p = Math.min(1, (t - startT) / duration);
+          const val = Math.round(start + diff * p);
+          el.textContent = val + suffix;
+          if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      }
+
+      btn.addEventListener('click', () => {
+        bar.style.width = '0%';
+        // trigger
+        requestAnimationFrame(() => {
+          bar.style.width = '100%';
+          countTo(success, 31, '%', 900);  // +31% task success
+          countTo(cost,    18, '%', 900);  // -18% cost
+          countTo(latency, 27, '%', 900);  // -27% latency
+          regress.textContent = '0';
+        });
+      });
+    })();
+
+    // Test demo — slider & SLO LED
+    (function(){
+      const root = document.querySelector('#features-test');
+      if (!root) return;
+      const slider = root.querySelector('.test-slider');
+      const value  = root.querySelector('.test-value');
+      const led    = root.querySelector('.test-led');
+      const ledTxt = root.querySelector('.test-led-text');
+
+      function update() {
+        const v = parseInt(slider.value, 10);
+        value.textContent = v + '%';
+        // pretend quality improves as rollout increases (demo)
+        const pass = v >= 15; // threshold for demo
+        led.style.backgroundColor = pass ? '#22C55E' : '#F87171';
+        ledTxt.textContent = pass ? 'Meets SLO' : 'Below SLO';
+      }
+      slider.addEventListener('input', update);
+      update();
+    })();
+
+    // Release demo — approve animation
+    (function(){
+      const root = document.querySelector('#features-release');
+      if (!root) return;
+      const btn  = root.querySelector('.btn-approve');
+      const bar  = root.querySelector('.release-progress');
+      const icon = root.querySelector('.release-icon');
+      const text = root.querySelector('.release-text');
+
+      btn.addEventListener('click', () => {
+        btn.disabled = true;
+        btn.style.opacity = .8;
+        // animate bar to 100%
+        bar.style.transition = 'width .9s cubic-bezier(.2,.8,.2,1)';
+        bar.style.width = '100%';
+        setTimeout(() => {
+          icon.style.color = '#22C55E';
+          text.textContent = 'Release approved • Rolling out';
+          btn.textContent = 'Approved';
+          btn.classList.remove('shadow-glow');
+        }, 950);
+      });
+    })();
+  </script>
+</section>
+<!-- ===================== /SECTION 2 ===================== -->
+<!-- ======================= SECTION 3: INTEGRATIONS ======================= -->
+<section id="integrations" class="relative py-24 md:py-28 overflow-hidden">
+  <!-- Ambient glows -->
+  <div aria-hidden="true" class="pointer-events-none absolute -top-24 right-[-10%] w-[560px] h-[560px] rounded-full blur-3xl opacity-25"
+       style="background: radial-gradient(closest-side, rgba(90,124,255,.28), rgba(90,124,255,.10), transparent 70%);"></div>
+  <div aria-hidden="true" class="pointer-events-none absolute -bottom-28 left-[-10%] w-[600px] h-[600px] rounded-full blur-3xl opacity-15"
+       style="background: radial-gradient(closest-side, rgba(255,255,255,.08), rgba(255,255,255,.03), transparent 70%);"></div>
+
+  <div class="max-w-7xl mx-auto px-6">
+    <!-- Header -->
+    <div class="max-w-2xl">
+      <div class="inline-flex items-center text-xs text-sub border border-white/10 rounded-full px-3 py-1 mb-4 bg-panel/60 glass">
+        Integrations
+      </div>
+      <h2 class="text-3xl md:text-5xl font-extrabold">Works with your stack.</h2>
+      <p class="mt-3 text-sub">
+        Connect providers, frameworks, observability, and data—so evaluation and rollouts fit right into your workflow.
+      </p>
+    </div>
+
+    <!-- Controls: filters + search -->
+    <div class="mt-8 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+      <div class="flex flex-wrap items-center gap-2" role="tablist" aria-label="Integration filters">
+        <button class="int-pill px-3 py-1.5 rounded-full text-sm bg-white/10 hover:bg-white/15 border border-white/10" data-filter="all" aria-selected="true">All</button>
+        <button class="int-pill px-3 py-1.5 rounded-full text-sm bg-white/10 hover:bg-white/15 border border-white/10" data-filter="models">Models</button>
+        <button class="int-pill px-3 py-1.5 rounded-full text-sm bg-white/10 hover:bg-white/15 border border-white/10" data-filter="frameworks">Frameworks</button>
+        <button class="int-pill px-3 py-1.5 rounded-full text-sm bg-white/10 hover:bg-white/15 border border-white/10" data-filter="observability">Observability</button>
+        <button class="int-pill px-3 py-1.5 rounded-full text-sm bg-white/10 hover:bg-white/15 border border-white/10" data-filter="data">Data</button>
+        <button class="int-pill px-3 py-1.5 rounded-full text-sm bg-white/10 hover:bg-white/15 border border-white/10" data-filter="messaging">Messaging</button>
+      </div>
+
+      <div class="relative w-full lg:w-80">
+        <input id="intSearch" type="search" placeholder="Search integrations…"
+               class="w-full rounded-2xl bg-panel border border-white/10 px-4 py-2.5 text-sm text-ink placeholder:text-sub focus:outline-none focus:ring-2 focus:ring-brand/50" />
+        <svg class="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-sub" fill="none" stroke="currentColor">
+          <path stroke-width="2" stroke-linecap="round" d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Marquee row (top providers) -->
+    <div class="mt-8 overflow-hidden border border-white/10 rounded-2xl bg-panel">
+      <div class="relative">
+        <div class="int-marquee flex items-center gap-10 py-3 px-6 whitespace-nowrap will-change-transform">
+          <span class="opacity-80">OpenAI</span>
+          <span class="opacity-80">Anthropic</span>
+          <span class="opacity-80">Azure OpenAI</span>
+          <span class="opacity-80">Vertex AI</span>
+          <span class="opacity-80">Cohere</span>
+          <span class="opacity-80">Mistral</span>
+          <span class="opacity-80">AWS Bedrock</span>
+          <span class="opacity-80">LangChain</span>
+          <span class="opacity-80">LlamaIndex</span>
+          <span class="opacity-80">Datadog</span>
+          <span class="opacity-80">Snowflake</span>
+          <span class="opacity-80">Slack</span>
+          <!-- clone set for seamless loop -->
+          <span class="opacity-80">OpenAI</span>
+          <span class="opacity-80">Anthropic</span>
+          <span class="opacity-80">Azure OpenAI</span>
+          <span class="opacity-80">Vertex AI</span>
+          <span class="opacity-80">Cohere</span>
+          <span class="opacity-80">Mistral</span>
+          <span class="opacity-80">AWS Bedrock</span>
+          <span class="opacity-80">LangChain</span>
+          <span class="opacity-80">LlamaIndex</span>
+          <span class="opacity-80">Datadog</span>
+          <span class="opacity-80">Snowflake</span>
+          <span class="opacity-80">Slack</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grid -->
+    <div class="mt-10 grid sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6" id="intGrid" aria-live="polite">
+      <!-- Each card: data-category, data-tags, deep link id -->
+      <!-- MODELS -->
+      <a id="integrations-openai" href="#integrations-openai" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="models" data-tags="openai gpt oai models provider">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">O</div>
+            <div>
+              <div class="font-semibold">OpenAI</div>
+              <div class="text-xs text-sub">GPT‑4o, mini, structured output</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Use OpenAI models for evals & shadow tests; log traces and enforce cost/latency SLOs.</p>
+        </div>
+      </a>
+
+      <a id="integrations-anthropic" href="#integrations-anthropic" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="models" data-tags="anthropic claude models provider">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">A</div>
+            <div>
+              <div class="font-semibold">Anthropic</div>
+              <div class="text-xs text-sub">Claude models</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Benchmark prompts on Claude and compare against other providers with golden datasets.</p>
+        </div>
+      </a>
+
+      <a id="integrations-azure" href="#integrations-azure" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="models" data-tags="azure openai microsoft models enterprise">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">Az</div>
+            <div>
+              <div class="font-semibold">Azure OpenAI</div>
+              <div class="text-xs text-sub">Enterprise GPT via Azure</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Use Azure endpoints, region pinning, and enterprise auth with the same eval workflow.</p>
+        </div>
+      </a>
+
+      <a id="integrations-vertex" href="#integrations-vertex" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="models" data-tags="google vertex ai models">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">G</div>
+            <div>
+              <div class="font-semibold">Vertex AI</div>
+              <div class="text-xs text-sub">Gemini & generative APIs</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Run evals on Gemini, capture metrics, and gate rollouts by quality and latency.</p>
+        </div>
+      </a>
+
+      <a id="integrations-bedrock" href="#integrations-bedrock" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="models" data-tags="aws bedrock mistral cohere models">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">AWS</div>
+            <div>
+              <div class="font-semibold">AWS Bedrock</div>
+              <div class="text-xs text-sub">Multi‑model access</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Evaluate across providers via Bedrock; compare cost & performance in one place.</p>
+        </div>
+      </a>
+
+      <a id="integrations-cohere" href="#integrations-cohere" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="models" data-tags="cohere rerank embed models">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">C</div>
+            <div>
+              <div class="font-semibold">Cohere</div>
+              <div class="text-xs text-sub">Rerank & embed</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Test retrieval quality with rerank and embedding metrics on your datasets.</p>
+        </div>
+      </a>
+
+      <a id="integrations-mistral" href="#integrations-mistral" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="models" data-tags="mistral models">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">Mi</div>
+            <div>
+              <div class="font-semibold">Mistral</div>
+              <div class="text-xs text-sub">Open weights & APIs</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Benchmark Mistral models and use guardrails to maintain quality over time.</p>
+        </div>
+      </a>
+
+      <!-- FRAMEWORKS -->
+      <a id="integrations-langchain" href="#integrations-langchain" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="frameworks" data-tags="langchain framework agents chains">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">LC</div>
+            <div>
+              <div class="font-semibold">LangChain</div>
+              <div class="text-xs text-sub">Chains & agents</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Log steps from LangChain, attach metrics, and debug failures with traces.</p>
+        </div>
+      </a>
+
+      <a id="integrations-llamaindex" href="#integrations-llamaindex" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="frameworks" data-tags="llamaindex framework rag">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">Li</div>
+            <div>
+              <div class="font-semibold">LlamaIndex</div>
+              <div class="text-xs text-sub">RAG toolkit</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Measure retrieval quality, track context windows, and prevent regressions.</p>
+        </div>
+      </a>
+
+      <a id="integrations-vercelai" href="#integrations-vercelai" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="frameworks" data-tags="vercel ai sdk edge">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">V</div>
+            <div>
+              <div class="font-semibold">Vercel AI SDK</div>
+              <div class="text-xs text-sub">Streaming & UI</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Capture streaming stats and user ratings while you iterate on prompts.</p>
+        </div>
+      </a>
+
+      <!-- OBSERVABILITY -->
+      <a id="integrations-datadog" href="#integrations-datadog" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="observability" data-tags="datadog metrics logs apm">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">Dd</div>
+            <div>
+              <div class="font-semibold">Datadog</div>
+              <div class="text-xs text-sub">APM & alerts</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Send alerts when SLOs breach; correlate latency spikes with deployments.</p>
+        </div>
+      </a>
+
+      <a id="integrations-sentry" href="#integrations-sentry" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="observability" data-tags="sentry errors tracing">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">Se</div>
+            <div>
+              <div class="font-semibold">Sentry</div>
+              <div class="text-xs text-sub">Errors & traces</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Track failures and prompt exceptions alongside your eval runs.</p>
+        </div>
+      </a>
+
+      <a id="integrations-newrelic" href="#integrations-newrelic" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="observability" data-tags="new relic apm">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">NR</div>
+            <div>
+              <div class="font-semibold">New Relic</div>
+              <div class="text-xs text-sub">APM & dashboards</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Dashboards for cost, latency, and quality across versions.</p>
+        </div>
+      </a>
+
+      <!-- DATA -->
+      <a id="integrations-snowflake" href="#integrations-snowflake" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="data" data-tags="snowflake warehouse data">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">Sf</div>
+            <div>
+              <div class="font-semibold">Snowflake</div>
+              <div class="text-xs text-sub">Data warehouse</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Import labeled datasets and export eval results to your lake/warehouse.</p>
+        </div>
+      </a>
+
+      <a id="integrations-bigquery" href="#integrations-bigquery" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="data" data-tags="bigquery google data">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">BQ</div>
+            <div>
+              <div class="font-semibold">BigQuery</div>
+              <div class="text-xs text-sub">Analytics</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Sync golden sets & push metrics for analysis and BI dashboards.</p>
+        </div>
+      </a>
+
+      <a id="integrations-postgres" href="#integrations-postgres" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="data" data-tags="postgres sql db">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">PG</div>
+            <div>
+              <div class="font-semibold">Postgres</div>
+              <div class="text-xs text-sub">Operational data</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Fetch evaluation samples and write back outcomes with version tags.</p>
+        </div>
+      </a>
+
+      <!-- MESSAGING -->
+      <a id="integrations-slack" href="#integrations-slack" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="messaging" data-tags="slack messaging alerts">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">S</div>
+            <div>
+              <div class="font-semibold">Slack</div>
+              <div class="text-xs text-sub">Alerts & approvals</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Get rollout alerts and approve releases right from your channel.</p>
+        </div>
+      </a>
+
+      <a id="integrations-teams" href="#integrations-teams" class="int-card group bg-panel border border-white/10 rounded-2xl p-5 relative" data-category="messaging" data-tags="microsoft teams messaging">
+        <div class="absolute -inset-0.5 rounded-[18px] opacity-0 group-hover:opacity-100 transition duration-300"
+             style="background: linear-gradient(180deg, rgba(90,124,255,.35), rgba(90,124,255,0)); filter: blur(14px);"></div>
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-sm">T</div>
+            <div>
+              <div class="font-semibold">Microsoft Teams</div>
+              <div class="text-xs text-sub">Approvals</div>
+            </div>
+          </div>
+          <p class="mt-3 text-sm text-sub int-desc">Notify stakeholders and collect approvals where they already work.</p>
+        </div>
+      </a>
+    </div>
+
+    <!-- Bottom row: request / docs link -->
+    <div class="mt-10 flex flex-wrap items-center gap-6 text-sm">
+      <a href="#cta" class="inline-flex items-center rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold shadow-glow">Request an integration</a>
+      <a href="#docs" class="link-underline hover:text-brand-soft">See the integration guides</a>
+    </div>
+  </div>
+
+  <!-- Floating tooltip -->
+  <div id="intTooltip" class="pointer-events-none fixed z-50 max-w-xs rounded-xl bg-panel border border-white/10 px-3 py-2 text-xs text-sub shadow-glow opacity-0 transition-opacity duration-150"></div>
+
+  <!-- Section-specific scripts -->
+  <script>
+    // ===== Scroll reveal
+    (function(){
+      const items = document.querySelectorAll('#intGrid .int-card');
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.style.transition = 'transform .55s cubic-bezier(.2,.8,.2,1), opacity .55s ease';
+            e.target.style.opacity = 1;
+            e.target.style.transform = 'translateY(0)';
+            io.unobserve(e.target);
+          }
+        });
+      }, {threshold: 0.12});
+      items.forEach((el,i) => {
+        el.style.opacity = 0;
+        el.style.transform = 'translateY(14px)';
+        el.style.transitionDelay = (i*50)+'ms';
+        io.observe(el);
+      });
+    })();
+
+    // ===== Hover lift / subtle tilt
+    (function(){
+      const cards = document.querySelectorAll('#intGrid .int-card');
+      cards.forEach(card => {
+        let rect;
+        const reset = () => { card.style.transform = 'translateY(0) perspective(900px) rotateX(0) rotateY(0)'; };
+        card.addEventListener('mouseenter', () => { rect = card.getBoundingClientRect(); card.style.willChange = 'transform'; });
+        card.addEventListener('mousemove', (e) => {
+          const x = e.clientX - rect.left, y = e.clientY - rect.top;
+          const rx = ((y/rect.height)-.5)*-4, ry = ((x/rect.width)-.5)*6;
+          card.style.transform = `translateY(-2px) perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+        });
+        card.addEventListener('mouseleave', () => { card.style.transition='transform .18s ease'; reset(); setTimeout(()=>card.style.transition='',200); });
+      });
+    })();
+
+    // ===== Tooltip (desktop: follow cursor, mobile: tap to pin)
+    (function(){
+      const tip = document.getElementById('intTooltip');
+      let pinned = null;
+
+      function showTip(el, x, y) {
+        tip.innerText = el.querySelector('.int-desc')?.innerText || '';
+        tip.style.left = (x+14) + 'px';
+        tip.style.top  = (y+14) + 'px';
+        tip.style.opacity = 1;
+      }
+      function hideTip() {
+        if (!pinned) tip.style.opacity = 0;
+      }
+
+      document.querySelectorAll('#intGrid .int-card').forEach(card => {
+        card.addEventListener('mousemove', (e) => { if (!pinned) showTip(card, e.clientX, e.clientY); });
+        card.addEventListener('mouseleave', hideTip);
+        card.addEventListener('click', (e) => {
+          // toggle pin on mobile or click
+          if (pinned === card) { pinned = null; tip.style.opacity = 0; }
+          else { pinned = card; showTip(card, e.clientX, e.clientY); }
+        });
+      });
+
+      // clicking outside unpins
+      document.addEventListener('click', (e) => {
+        const within = e.target.closest?.('.int-card');
+        if (!within && pinned) { pinned = null; tip.style.opacity = 0; }
+      });
+    })();
+
+    // ===== Filters & search
+    (function(){
+      const pills  = document.querySelectorAll('.int-pill');
+      const cards  = Array.from(document.querySelectorAll('#intGrid .int-card'));
+      const search = document.getElementById('intSearch');
+      let active = 'all';
+
+      function apply() {
+        const q = (search.value || '').toLowerCase().trim();
+        cards.forEach(c => {
+          const cat  = c.dataset.category;
+          const tags = (c.dataset.tags || '') + ' ' + (c.innerText || '');
+          const matchCat = active === 'all' || active === cat;
+          const matchTxt = !q || tags.toLowerCase().includes(q);
+          const show = matchCat && matchTxt;
+          c.style.display = show ? '' : 'none';
+        });
+      }
+
+      pills.forEach(p => {
+        p.addEventListener('click', () => {
+          pills.forEach(x => x.setAttribute('aria-selected','false'));
+          p.setAttribute('aria-selected','true');
+          active = p.dataset.filter;
+          apply();
+        });
+      });
+      search.addEventListener('input', apply);
+      apply();
+    })();
+
+    // ===== Marquee (pause on hover)
+    (function(){
+      const row = document.querySelector('.int-marquee');
+      let raf, x = 0, speed = 0.4, paused = false;
+
+      function loop(){
+        if (!paused) {
+          x -= speed;
+          if (x < -row.scrollWidth/2) x = 0; // seamless reset (because we duplicated items)
+          row.style.transform = `translateX(${x}px)`;
+        }
+        raf = requestAnimationFrame(loop);
+      }
+      row.addEventListener('mouseenter', ()=> paused = true);
+      row.addEventListener('mouseleave', ()=> paused = false);
+      loop();
+    })();
+  </script>
+</section>
+<!-- ===================== /SECTION 3 ===================== -->
+
+<!-- ======================= SECTION 4: PRICING ======================= -->
+<section id="pricing" class="relative py-24 md:py-28 overflow-hidden">
+  <!-- Ambient glows -->
+  <div aria-hidden="true" class="pointer-events-none absolute -top-28 right-[-8%] w-[560px] h-[560px] rounded-full blur-3xl opacity-25"
+       style="background: radial-gradient(closest-side, rgba(90,124,255,.25), rgba(90,124,255,.10), transparent 70%);"></div>
+  <div aria-hidden="true" class="pointer-events-none absolute -bottom-24 left-[-10%] w-[600px] h-[600px] rounded-full blur-3xl opacity-15"
+       style="background: radial-gradient(closest-side, rgba(255,255,255,.08), rgba(255,255,255,.03), transparent 70%);"></div>
+
+  <div class="max-w-7xl mx-auto px-6">
+    <!-- Header -->
+    <div class="text-center max-w-3xl mx-auto">
+      <div class="inline-flex items-center text-xs text-sub border border-white/10 rounded-full px-3 py-1 mb-4 bg-panel/60 glass">
+        Pricing
+      </div>
+      <h2 class="text-3xl md:text-5xl font-extrabold">Simple, dev‑friendly pricing.</h2>
+      <p class="mt-3 text-sub">Start free. Scale when you’re ready. No hidden fees.</p>
+
+      <!-- Billing toggle -->
+      <div class="mt-6 flex items-center justify-center gap-3 text-sm select-none">
+        <span class="text-sub">Monthly</span>
+        <label class="inline-flex items-center cursor-pointer">
+          <input id="priceToggle" type="checkbox" class="sr-only peer" aria-label="Toggle annual billing">
+          <div class="w-14 h-7 bg-white/10 border border-white/10 rounded-full relative after:content-[''] after:absolute after:top-1 after:left-1 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition peer-checked:bg-brand peer-checked:after:translate-x-7"></div>
+        </label>
+        <span class="text-sub">Annual
+          <span class="ml-1 rounded-full px-2 py-0.5 text-xs bg-success/20 text-success align-middle">Save 15%</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Plans -->
+    <div class="mt-12 grid md:grid-cols-3 gap-6" aria-live="polite">
+      <!-- Free -->
+      <div class="price-card bg-panel border border-white/10 rounded-3xl p-6 flex flex-col will-change-transform">
+        <div class="text-sm text-sub">Free</div>
+        <div class="mt-2 flex items-end gap-2">
+          <div class="text-4xl font-extrabold tabular-nums">
+            <span class="js-price" data-monthly="0" data-annual="0">0</span>
+          </div>
+          <div class="text-sub">/mo</div>
+        </div>
+        <p class="mt-2 text-sub">For trying out the platform.</p>
+        <ul class="mt-5 space-y-2 text-sm text-ink/80 flex-1">
+          <li class="flex items-start gap-2"><span class="mt-1 h-1.5 w-1.5 rounded-full bg-brand"></span>5k eval credits / month</li>
+          <li class="flex items-start gap-2"><span class="mt-1 h-1.5 w-1.5 rounded-full bg-brand"></span>1 seat</li>
+          <li class="flex items-start gap-2"><span class="mt-1 h-1.5 w-1.5 rounded-full bg-brand"></span>Community support</li>
+        </ul>
+        <a href="#cta" class="mt-6 inline-flex items-center justify-center rounded-xl px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/10 font-semibold">Start Free</a>
+      </div>
+
+      <!-- Team (featured) -->
+      <div class="price-card bg-panel border border-brand/40 rounded-3xl p-6 shadow-glow flex flex-col relative will-change-transform">
+        <div class="absolute -top-3 right-4 text-xs bg-brand text-bg px-2 py-1 rounded-full font-semibold shadow-glow">Most popular</div>
+        <div class="text-sm text-brand-soft">Team</div>
+        <div class="mt-2 flex items-end gap-2">
+          <div class="text-4xl font-extrabold tabular-nums">
+            <span class="js-price" data-monthly="299" data-annual="254">299</span>
+          </div>
+          <div class="text-sub">/mo</div>
+        </div>
+        <p class="mt-2 text-sub">Best for teams shipping weekly.</p>
+        <ul class="mt-5 space-y-2 text-sm text-ink/80 flex-1">
+          <li class="flex items-start gap-2">
+            <svg class="h-4 w-4 text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7l-9 9-5-5"/></svg>
+            100k eval credits / month
+          </li>
+          <li class="flex items-start gap-2">
+            <svg class="h-4 w-4 text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7l-9 9-5-5"/></svg>
+            10 seats included
+          </li>
+          <li class="flex items-start gap-2">
+            <svg class="h-4 w-4 text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7l-9 9-5-5"/></svg>
+            SSO, priority support
+          </li>
+          <li class="flex items-start gap-2">
+            <svg class="h-4 w-4 text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7l-9 9-5-5"/></svg>
+            Alerts & webhooks
+          </li>
+        </ul>
+        <a href="#cta" class="mt-6 inline-flex items-center justify-center rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold shadow-glow">Get API Key</a>
+      </div>
+
+      <!-- Enterprise -->
+      <div class="price-card bg-panel border border-white/10 rounded-3xl p-6 flex flex-col will-change-transform">
+        <div class="text-sm text-sub">Enterprise</div>
+        <div class="mt-2 flex items-end gap-2">
+          <div class="text-4xl font-extrabold">Custom</div>
+        </div>
+        <p class="mt-2 text-sub">For security‑sensitive orgs & high scale.</p>
+        <ul class="mt-5 space-y-2 text-sm text-ink/80 flex-1">
+          <li class="flex items-start gap-2">
+            <svg class="h-4 w-4 text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7l-9 9-5-5"/></svg>
+            Unlimited evals
+          </li>
+          <li class="flex items-start gap-2">
+            <svg class="h-4 w-4 text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7l-9 9-5-5"/></svg>
+            SAML/SCIM, VPC & private networking
+          </li>
+          <li class="flex items-start gap-2">
+            <svg class="h-4 w-4 text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7l-9 9-5-5"/></svg>
+            Custom SLAs & onboarding
+          </li>
+          <li class="flex items-start gap-2">
+            <svg class="h-4 w-4 text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7l-9 9-5-5"/></svg>
+            Dedicated CSM
+          </li>
+        </ul>
+        <a href="#cta" class="mt-6 inline-flex items-center justify-center rounded-xl px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/10 font-semibold">Talk to Sales</a>
+      </div>
+    </div>
+
+    <!-- Feature comparison -->
+    <div class="mt-12 bg-panel border border-white/10 rounded-3xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Compare features</h3>
+        <span class="text-xs text-sub">Hover or tap for details</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-sub">
+            <tr class="border-b border-white/10">
+              <th class="text-left px-6 py-3">Feature</th>
+              <th class="text-center px-6 py-3">Free</th>
+              <th class="text-center px-6 py-3">Team</th>
+              <th class="text-center px-6 py-3">Enterprise</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Row -->
+            <tr class="border-b border-white/5 hover:bg-white/5 feature-row" data-tip="Monthly credits for automated evaluations.">
+              <td class="px-6 py-4">Eval credits</td>
+              <td class="px-6 py-4 text-center tabular-nums">5k</td>
+              <td class="px-6 py-4 text-center tabular-nums">100k</td>
+              <td class="px-6 py-4 text-center">Unlimited</td>
+            </tr>
+            <tr class="border-b border-white/5 hover:bg-white/5 feature-row" data-tip="Invite teammates to manage datasets, prompts, and releases.">
+              <td class="px-6 py-4">Seats</td>
+              <td class="px-6 py-4 text-center">1</td>
+              <td class="px-6 py-4 text-center">10</td>
+              <td class="px-6 py-4 text-center">Unlimited</td>
+            </tr>
+            <tr class="border-b border-white/5 hover:bg-white/5 feature-row" data-tip="Single sign-on for secure access.">
+              <td class="px-6 py-4">SSO/SAML</td>
+              <td class="px-6 py-4 text-center">—</td>
+              <td class="px-6 py-4 text-center">
+                <svg class="h-5 w-5 inline text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M20 7l-9 9-5-5"/></svg>
+              </td>
+              <td class="px-6 py-4 text-center">
+                <svg class="h-5 w-5 inline text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M20 7l-9 9-5-5"/></svg>
+              </td>
+            </tr>
+            <tr class="border-b border-white/5 hover:bg-white/5 feature-row" data-tip="Automated alerts and rollbacks when SLOs are violated.">
+              <td class="px-6 py-4">Guardrails & SLOs</td>
+              <td class="px-6 py-4 text-center">—</td>
+              <td class="px-6 py-4 text-center">
+                <svg class="h-5 w-5 inline text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M20 7l-9 9-5-5"/></svg>
+              </td>
+              <td class="px-6 py-4 text-center">
+                <svg class="h-5 w-5 inline text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M20 7l-9 9-5-5"/></svg>
+              </td>
+            </tr>
+            <tr class="border-b border-white/5 hover:bg-white/5 feature-row" data-tip="Private networking, VPC peering, and dedicated instances.">
+              <td class="px-6 py-4">VPC / Private networking</td>
+              <td class="px-6 py-4 text-center">—</td>
+              <td class="px-6 py-4 text-center">—</td>
+              <td class="px-6 py-4 text-center">
+                <svg class="h-5 w-5 inline text-brand-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M20 7l-9 9-5-5"/></svg>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Add-ons -->
+    <div class="mt-12 grid lg:grid-cols-2 gap-6">
+      <!-- Seats add-on -->
+      <div class="bg-panel border border-white/10 rounded-3xl p-6">
+        <div class="flex items-center justify-between">
+          <h4 class="text-lg font-semibold">Add seats</h4>
+          <span class="text-xs text-sub">Team & Enterprise</span>
+        </div>
+        <p class="mt-1 text-sub">Need more than what’s included? Add seats anytime.</p>
+        <div class="mt-4 flex items-center gap-4">
+          <div class="inline-flex items-center border border-white/10 rounded-xl">
+            <button class="seat-minus px-3 py-2 text-xl leading-none select-none">−</button>
+            <div class="seat-count w-12 text-center tabular-nums">0</div>
+            <button class="seat-plus px-3 py-2 text-xl leading-none select-none">+</button>
+          </div>
+          <div class="text-sub text-sm">+ <span class="seat-price tabular-nums">$10</span> / seat / mo</div>
+        </div>
+      </div>
+
+      <!-- Credits add-on -->
+      <div class="bg-panel border border-white/10 rounded-3xl p-6">
+        <div class="flex items-center justify-between">
+          <h4 class="text-lg font-semibold">Extra eval credits</h4>
+          <span class="text-xs text-sub">Any plan</span>
+        </div>
+        <p class="mt-1 text-sub">Top up credits for large runs or spikes in traffic.</p>
+        <div class="mt-4 flex items-center gap-4">
+          <div class="inline-flex items-center border border-white/10 rounded-xl">
+            <button class="cred-minus px-3 py-2 text-xl leading-none select-none">−</button>
+            <div class="cred-count w-16 text-center tabular-nums">0</div>
+            <button class="cred-plus px-3 py-2 text-xl leading-none select-none">+</button>
+          </div>
+          <div class="text-sub text-sm">+ <span class="cred-price tabular-nums">$0</span> / mo</div>
+        </div>
+        <div class="mt-2 text-xs text-sub">+$49 per 50k credits</div>
+      </div>
+    </div>
+
+    <!-- Bottom micro-CTA row -->
+    <div class="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm">
+      <a href="#docs" class="link-underline hover:text-brand-soft">Read the billing guide</a>
+      <span class="h-4 w-px bg-white/10"></span>
+      <a href="#cta" class="inline-flex items-center rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold shadow-glow">Get started</a>
+    </div>
+  </div>
+
+ 
+  <!-- Section scripts -->
+  <script>
+    // ===== Scroll reveal for cards
+    (function(){
+      const cards = document.querySelectorAll('#pricing .price-card');
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.style.transition = 'transform .6s cubic-bezier(.2,.8,.2,1), opacity .6s ease';
+            e.target.style.opacity = 1;
+            e.target.style.transform = 'translateY(0)';
+            io.unobserve(e.target);
+          }
+        });
+      }, {threshold: 0.15});
+      cards.forEach((c,i) => {
+        c.style.opacity = 0;
+        c.style.transform = 'translateY(16px)';
+        c.style.transitionDelay = (i*90)+'ms';
+        io.observe(c);
+      });
+    })();
+
+    // ===== Price toggle with animated counters
+    (function(){
+      const toggle = document.querySelector('#pricing #priceToggle');
+      const fields = document.querySelectorAll('#pricing .js-price');
+
+      function countTo(el, target, duration=450) {
+        const start = parseInt(el.textContent.replace(/[^0-9]/g,'')) || 0;
+        const end = parseInt(target,10);
+        if (start === end) return;
+        const startT = performance.now();
+        function tick(t){
+          const p = Math.min(1, (t - startT) / duration);
+          const eased = 1 - Math.pow(1 - p, 3);
+          const val = Math.round(start + (end - start) * eased);
+          el.textContent = val.toString();
+          if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      }
+
+      function apply() {
+        const annual = toggle.checked;
+        fields.forEach(el => {
+          const next = annual ? el.dataset.annual : el.dataset.monthly;
+          countTo(el, next);
+        });
+        // Update add-on unit prices
+        seatUnit = annual ? 8.5 : 10; // annual discount
+        updateSeats();
+        updateCreds();
+      }
+      toggle?.addEventListener('change', apply);
+      apply();
+
+      // Expose vars to other handlers
+      window.__pricingState = { annual: () => toggle.checked };
+    })();
+
+<script>
+  // ===== Tooltip for comparison rows (hover + tap-to-pin + keyboard)
+  (function(){
+    const tip = document.getElementById('priceTooltip');
+    const rows = document.querySelectorAll('#pricing .feature-row');
+    let pinned = null;
+
+    function show(row, x, y) {
+      tip.textContent = row.dataset.tip || '';
+      // If x/y not provided (keyboard focus), anchor it just right of the row
+      if (x == null || y == null) {
+        const r = row.getBoundingClientRect();
+        x = r.right + 8;
+        y = r.top + window.scrollY + 8;
+      }
+      tip.style.left = (x + 14) + 'px';
+      tip.style.top  = (y + 14) + 'px';
+      tip.style.opacity = 1;
+    }
+    function hide() { if (!pinned) tip.style.opacity = 0; }
+
+    rows.forEach(row => {
+      // Keyboard focusable for accessibility
+      row.setAttribute('tabindex','0');
+
+      // Desktop hover
+      row.addEventListener('mousemove', e => { if (!pinned) show(row, e.clientX, e.clientY); });
+      row.addEventListener('mouseleave', hide);
+
+      // Tap / click to pin/unpin (mobile & desktop)
+      row.addEventListener('click', e => {
+        if (pinned === row) { pinned = null; tip.style.opacity = 0; }
+        else { pinned = row; show(row, e.clientX, e.clientY); }
+      });
+      row.addEventListener('touchstart', e => {
+        const t = e.touches[0];
+        if (pinned === row) { pinned = null; tip.style.opacity = 0; }
+        else { pinned = row; show(row, t.clientX, t.clientY); }
+      }, { passive: true });
+
+      // Keyboard: show on focus, hide on blur
+      row.addEventListener('focus', () => show(row));
+      row.addEventListener('blur',  () => { if (!pinned) tip.style.opacity = 0; });
+    });
+
+    // Clicking outside unpins
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.feature-row') && pinned) { pinned = null; tip.style.opacity = 0; }
+    });
+    // Hide on scroll if not pinned
+    window.addEventListener('scroll', () => { if (!pinned) tip.style.opacity = 0; }, { passive: true });
+  })();
+</script>
+
+  </script>
+  <!-- === Pricing tooltip patch (drop-in) === -->
+<style>
+  /* Ensure the tooltip is visible above everything */
+  #priceTooltip {
+    position: fixed;
+    z-index: 99999;
+    max-width: 22rem;
+    padding: .5rem .75rem;
+    border-radius: .75rem;
+    border: 1px solid rgba(255,255,255,.1);
+    background: rgba(15,17,22,.96);
+    color: #A9B2C7;
+    font-size: .75rem;
+    line-height: 1.2;
+    box-shadow: 0 0 0 1px rgba(90,124,255,.18), 0 8px 28px rgba(90,124,255,.18);
+    opacity: 0;
+    transition: opacity .15s ease;
+    pointer-events: none;
+  }
+</style>
+
+<script>
+(function(){
+  const section = document.getElementById('pricing');
+  if (!section) return;
+
+  // 1) Ensure a tooltip element exists (inject if missing)
+  let tip = document.getElementById('priceTooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'priceTooltip';
+    tip.textContent = '';
+    document.body.appendChild(tip); // attach to body for safest stacking
+  }
+
+  // 2) Find rows to attach tooltips to.
+  // Prefer rows with data-tip; fallback to rows with class feature-row; fallback to all body rows.
+  let rows = section.querySelectorAll('tbody tr[data-tip]');
+  if (!rows.length) rows = section.querySelectorAll('tbody tr.feature-row');
+  if (!rows.length) rows = section.querySelectorAll('tbody tr');
+
+  // If rows don't already have data-tip, create a simple default based on the first cell text.
+  rows.forEach(r => {
+    if (!r.dataset.tip) {
+      const name = r.querySelector('td')?.innerText?.trim() || 'Feature';
+      r.dataset.tip = `More about “${name}”.`;
+    }
+    // Make keyboard focusable for a11y
+    r.setAttribute('tabindex','0');
+  });
+
+  // 3) Show/hide helpers
+  let pinned = null;
+  function show(row, clientX, clientY) {
+    tip.textContent = row.dataset.tip || '';
+    // If no coords (keyboard focus), place near the row
+    if (clientX == null || clientY == null) {
+      const rect = row.getBoundingClientRect();
+      clientX = rect.right + 8;    // to the right of the row
+      clientY = rect.top  + 8;     // slight down offset
+    }
+    // Position (viewport coords; fixed element)
+    tip.style.left = (clientX + 14) + 'px';
+    tip.style.top  = (clientY + 14) + 'px';
+    tip.style.opacity = 1;
+  }
+  function hide() {
+    if (!pinned) tip.style.opacity = 0;
+  }
+
+  // 4) Wire up events
+  rows.forEach(row => {
+    // Hover (desktop)
+    row.addEventListener('mousemove', e => { if (!pinned) show(row, e.clientX, e.clientY); });
+    row.addEventListener('mouseleave', hide);
+
+    // Tap/click to pin/unpin (mobile & desktop)
+    row.addEventListener('click', e => {
+      if (pinned === row) { pinned = null; tip.style.opacity = 0; }
+      else { pinned = row; show(row, e.clientX, e.clientY); }
+    }, { passive: true });
+    row.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      if (pinned === row) { pinned = null; tip.style.opacity = 0; }
+      else { pinned = row; show(row, t.clientX, t.clientY); }
+    }, { passive: true });
+
+    // Keyboard
+    row.addEventListener('focus', () => show(row));
+    row.addEventListener('blur',  () => { if (!pinned) tip.style.opacity = 0; });
+    row.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && pinned) { pinned = null; tip.style.opacity = 0; }
+    });
+  });
+
+  // Clicking outside unpins
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#pricing tbody tr')) { pinned = null; tip.style.opacity = 0; }
+  });
+
+  // Hide on scroll if not pinned
+  window.addEventListener('scroll', () => { if (!pinned) tip.style.opacity = 0; }, { passive: true });
+
+  // 5) (Optional) Update helper text to say "Hover or tap"
+  const helper = section.querySelector('span.text-xs.text-sub');
+  if (helper && /Hover for details/i.test(helper.textContent)) {
+    helper.textContent = 'Hover or tap for details';
+  }
+
+  // 6) Debug: if you still don’t see tooltips, open the browser console.
+  // If there’s any red error, paste it to me and I’ll fix instantly.
+})();
+</script>
+
+</section>
+<!-- ===================== /SECTION 4 ===================== -->
+
+<!-- ======================= SECTION 5: SECURITY & COMPLIANCE ======================= -->
+<section id="security" class="relative py-24 md:py-28 overflow-hidden">
+  <!-- Ambient glows -->
+  <div aria-hidden="true" class="pointer-events-none absolute -top-24 right-[-10%] w-[600px] h-[600px] rounded-full blur-3xl opacity-20"
+       style="background: radial-gradient(closest-side, rgba(90,124,255,.25), rgba(90,124,255,.1), transparent 70%);"></div>
+  <div aria-hidden="true" class="pointer-events-none absolute -bottom-28 left-[-8%] w-[560px] h-[560px] rounded-full blur-3xl opacity-15"
+       style="background: radial-gradient(closest-side, rgba(255,255,255,.08), rgba(255,255,255,.03), transparent 70%);"></div>
+
+  <div class="max-w-7xl mx-auto px-6">
+    <!-- Header -->
+    <div class="max-w-3xl">
+      <div class="inline-flex items-center text-xs text-sub border border-white/10 rounded-full px-3 py-1 mb-4 bg-panel/60 glass">
+        Security & Compliance
+      </div>
+      <h2 class="text-3xl md:text-5xl font-extrabold">Enterprise‑grade trust.</h2>
+      <p class="mt-3 text-sub">SOC2 Type II, SSO/SAML, SCIM, data residency, and PII redaction built‑in. Guardrails to keep quality, cost, and latency within SLOs.</p>
+    </div>
+
+    <!-- Badges -->
+    <div class="mt-8 grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div class="sec-badge bg-panel border border-white/10 rounded-2xl p-4 flex items-center gap-3">
+        <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center">🔒</div>
+        <div>
+          <div class="font-semibold">SOC2 Type II</div>
+          <div class="text-xs text-sub">Controls audited</div>
+        </div>
+      </div>
+      <div class="sec-badge bg-panel border border-white/10 rounded-2xl p-4 flex items-center gap-3">
+        <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center">🔐</div>
+        <div>
+          <div class="font-semibold">SSO / SAML</div>
+          <div class="text-xs text-sub">Okta, Azure AD, more</div>
+        </div>
+      </div>
+      <div class="sec-badge bg-panel border border-white/10 rounded-2xl p-4 flex items-center gap-3">
+        <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center">👥</div>
+        <div>
+          <div class="font-semibold">SCIM</div>
+          <div class="text-xs text-sub">User provisioning</div>
+        </div>
+      </div>
+      <div class="sec-badge bg-panel border border-white/10 rounded-2xl p-4 flex items-center gap-3">
+        <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center">📜</div>
+        <div>
+          <div class="font-semibold">DPA</div>
+          <div class="text-xs text-sub">On request</div>
+        </div>
+      </div>
+      <div class="sec-badge bg-panel border border-white/10 rounded-2xl p-4 flex items-center gap-3">
+        <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center">🛡️</div>
+        <div>
+          <div class="font-semibold">Pentest</div>
+          <div class="text-xs text-sub">Annual & on release</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls & Settings -->
+    <div class="mt-10 grid lg:grid-cols-2 gap-6">
+      <!-- Settings panel -->
+      <div class="bg-panel border border-white/10 rounded-3xl p-6">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold">Data controls</h3>
+          <span class="text-xs text-sub">Configured per workspace</span>
+        </div>
+
+        <!-- Residency -->
+        <div class="mt-5">
+          <label class="text-sm font-semibold">Data residency</label>
+          <div class="mt-2 grid grid-cols-3 gap-2">
+            <button class="res-pill px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-sm" data-region="us">US</button>
+            <button class="res-pill px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-sm" data-region="eu">EU</button>
+            <button class="res-pill px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-sm" data-region="custom">Custom</button>
+          </div>
+          <div class="mt-2 text-xs text-sub">Choose where your eval data and logs are stored.</div>
+        </div>
+
+        <!-- Retention -->
+        <div class="mt-6">
+          <label class="text-sm font-semibold">Retention period</label>
+          <div class="mt-2 flex items-center gap-3">
+            <input id="retSlider" type="range" min="7" max="365" value="90" class="w-full accent-brand" />
+            <div class="w-24 text-right tabular-nums"><span id="retDays">90</span> days</div>
+          </div>
+          <div class="mt-2 text-xs text-sub">Adjust how long traces & datasets are kept.</div>
+        </div>
+
+        <!-- PII redaction -->
+        <div class="mt-6 flex items-center justify-between">
+          <div>
+            <div class="text-sm font-semibold">PII redaction</div>
+            <div class="text-xs text-sub">Mask emails, phones, addresses at ingest.</div>
+          </div>
+          <label class="inline-flex items-center cursor-pointer">
+            <input id="piiToggle" type="checkbox" class="sr-only peer">
+            <div class="w-12 h-6 bg-white/10 border border-white/10 rounded-full relative after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:bg-brand peer-checked:after:translate-x-6"></div>
+          </label>
+        </div>
+
+        <!-- IP allowlist -->
+        <div class="mt-6">
+          <label class="text-sm font-semibold">IP allowlist</label>
+          <div class="mt-2 flex items-center gap-2">
+            <input id="ipInput" type="text" placeholder="e.g. 203.0.113.42"
+                   class="flex-1 rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-ink placeholder:text-sub focus:outline-none focus:ring-2 focus:ring-brand/40" />
+            <button id="ipAdd" class="rounded-xl px-3 py-2 bg-white/10 hover:bg-white/15 border border-white/10 text-sm">Add</button>
+          </div>
+          <div id="ipList" class="mt-3 flex flex-wrap gap-2 text-xs"></div>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <a href="#docs" class="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/10 font-semibold text-sm">View security docs</a>
+          <a href="#cta" class="rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold text-sm shadow-glow">Request DPA</a>
+        </div>
+      </div>
+
+      <!-- Architecture & audit -->
+      <div class="bg-panel border border-white/10 rounded-3xl p-6">
+        <div class="text-sm text-sub">Architecture</div>
+        <h3 class="text-lg font-semibold mt-1">Encryption, roles, and audit trails.</h3>
+
+        <!-- Architecture bullets -->
+        <ul class="mt-4 space-y-2 text-sm text-ink/80">
+          <li>• Encryption <span class="text-sub">(in transit TLS 1.2+, at rest AES‑256)</span></li>
+          <li>• Role‑based access control, least privilege</li>
+          <li>• Customer‑managed retention & residency</li>
+          <li>• Region pinning & private networking (Enterprise)</li>
+        </ul>
+
+        <!-- Audit log preview -->
+        <div class="mt-5 border border-white/10 rounded-2xl overflow-hidden">
+          <div class="px-4 py-2 text-xs text-sub border-b border-white/10 bg-white/5">Recent audit log</div>
+          <div class="divide-y divide-white/10 text-sm">
+            <div class="px-4 py-2 flex items-center justify-between">
+              <span>🔁 Rolled out <span class="font-semibold">prompt v19</span> to <span class="font-semibold">20%</span></span>
+              <span class="text-sub text-xs">2m ago</span>
+            </div>
+            <div class="px-4 py-2 flex items-center justify-between">
+              <span>🧪 Eval run <span class="font-semibold">#342</span> passed thresholds</span>
+              <span class="text-sub text-xs">9m ago</span>
+            </div>
+            <div class="px-4 py-2 flex items-center justify-between">
+              <span>👤 SSO login <span class="font-semibold">okta:pm@company.com</span></span>
+              <span class="text-sub text-xs">14m ago</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expandable details -->
+        <div class="mt-5 space-y-3">
+          <details class="group bg-white/5 rounded-xl p-4">
+            <summary class="flex items-center justify-between cursor-pointer list-none">
+              <span class="font-semibold">Security architecture</span>
+              <span class="text-sub group-open:rotate-180 transition">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor"><path stroke-width="2" d="M6 9l6 6 6-6"/></svg>
+              </span>
+            </summary>
+            <p class="mt-2 text-sub text-sm">Multi‑tenant isolation, encrypted secrets, and scoped API keys with fine‑grained permissions.</p>
+          </details>
+
+          <details class="group bg-white/5 rounded-xl p-4">
+            <summary class="flex items-center justify-between cursor-pointer list-none">
+              <span class="font-semibold">Data processing & privacy</span>
+              <span class="text-sub group-open:rotate-180 transition">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor"><path stroke-width="2" d="M6 9l6 6 6-6"/></svg>
+              </span>
+            </summary>
+            <p class="mt-2 text-sub text-sm">Optional PII redaction at ingest, configurable retention, and regional storage compliant with GDPR/CCPA.</p>
+          </details>
+
+          <details class="group bg-white/5 rounded-xl p-4">
+            <summary class="flex items-center justify-between cursor-pointer list-none">
+              <span class="font-semibold">Penetration testing</span>
+              <span class="text-sub group-open:rotate-180 transition">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor"><path stroke-width="2" d="M6 9l6 6 6-6"/></svg>
+              </span>
+            </summary>
+            <p class="mt-2 text-sub text-sm">Independent pentests annually and after major changes; findings triaged with SLA‑based remediation.</p>
+          </details>
+
+          <details class="group bg-white/5 rounded-xl p-4">
+            <summary class="flex items-center justify-between cursor-pointer list-none">
+              <span class="font-semibold">Vulnerability disclosure</span>
+              <span class="text-sub group-open:rotate-180 transition">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor"><path stroke-width="2" d="M6 9l6 6 6-6"/></svg>
+              </span>
+            </summary>
+            <p class="mt-2 text-sub text-sm">Coordinated disclosure program with monitored security@ inbox and temporary safe‑harbor for good‑faith research.</p>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compliance Matrix -->
+    <div class="mt-10 bg-panel border border-white/10 rounded-3xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Compliance matrix</h3>
+        <span class="text-xs text-sub">Hover for details</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-sub">
+            <tr class="border-b border-white/10">
+              <th class="text-left px-6 py-3">Control</th>
+              <th class="text-center px-6 py-3">Free</th>
+              <th class="text-center px-6 py-3">Team</th>
+              <th class="text-center px-6 py-3">Enterprise</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b border-white/5 hover:bg-white/5 tiprow" data-tip="Independent audit of security controls.">
+              <td class="px-6 py-4">SOC2 Type II</td>
+              <td class="px-6 py-4 text-center">—</td>
+              <td class="px-6 py-4 text-center">Included</td>
+              <td class="px-6 py-4 text-center">Included</td>
+            </tr>
+            <tr class="border-b border-white/5 hover:bg-white/5 tiprow" data-tip="Single sign‑on via SAML (Okta, Azure AD, Google).">
+              <td class="px-6 py-4">SSO / SAML</td>
+              <td class="px-6 py-4 text-center">—</td>
+              <td class="px-6 py-4 text-center">Included</td>
+              <td class="px-6 py-4 text-center">Included</td>
+            </tr>
+            <tr class="border-b border-white/5 hover:bg-white/5 tiprow" data-tip="Automatic user lifecycle management via SCIM.">
+              <td class="px-6 py-4">SCIM</td>
+              <td class="px-6 py-4 text-center">—</td>
+              <td class="px-6 py-4 text-center">Included</td>
+              <td class="px-6 py-4 text-center">Included</td>
+            </tr>
+            <tr class="border-b border-white/5 hover:bg-white/5 tiprow" data-tip="Store data in the US or EU; custom regions available on Enterprise.">
+              <td class="px-6 py-4">Data residency</td>
+              <td class="px-6 py-4 text-center">US</td>
+              <td class="px-6 py-4 text-center">US / EU</td>
+              <td class="px-6 py-4 text-center">Custom</td>
+            </tr>
+            <tr class="border-b border-white/5 hover:bg-white/5 tiprow" data-tip="Mask sensitive fields at ingest.">
+              <td class="px-6 py-4">PII redaction</td>
+              <td class="px-6 py-4 text-center">—</td>
+              <td class="px-6 py-4 text-center">Optional</td>
+              <td class="px-6 py-4 text-center">Optional</td>
+            </tr>
+            <tr class="border-b border-white/5 hover:bg-white/5 tiprow" data-tip="Private networking & VPC peering.">
+              <td class="px-6 py-4">VPC / Private networking</td>
+              <td class="px-6 py-4 text-center">—</td>
+              <td class="px-6 py-4 text-center">—</td>
+              <td class="px-6 py-4 text-center">Included</td>
+            </tr>
+            <tr class="hover:bg-white/5 tiprow" data-tip="GDPR and CCPA alignment with DPA on request.">
+              <td class="px-6 py-4">GDPR / CCPA</td>
+              <td class="px-6 py-4 text-center">Aligned</td>
+              <td class="px-6 py-4 text-center">Aligned</td>
+              <td class="px-6 py-4 text-center">Aligned + DPA</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Bottom CTA -->
+    <div class="mt-10 flex flex-wrap items-center gap-6 text-sm">
+      <a href="#docs" class="link-underline hover:text-brand-soft">Read security documentation</a>
+      <span class="h-4 w-px bg-white/10"></span>
+      <a href="#cta" class="inline-flex items-center rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold shadow-glow">Request DPA</a>
+    </div>
+  </div>
+
+  <!-- Floating tooltip -->
+  <div id="secTooltip" class="pointer-events-none fixed z-50 max-w-xs rounded-xl bg-panel border border-white/10 px-3 py-2 text-xs text-sub shadow-glow opacity-0 transition-opacity duration-150"></div>
+
+  <!-- Section scripts -->
+  <script>
+    // ===== Reveal & badge shimmer
+    (function(){
+      // Scroll reveal
+      const blocks = document.querySelectorAll('#security .bg-panel, #security .sec-badge, #security table');
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.style.transition = 'transform .6s cubic-bezier(.2,.8,.2,1), opacity .6s ease';
+            e.target.style.opacity = 1;
+            e.target.style.transform = 'translateY(0)';
+            io.unobserve(e.target);
+          }
+        });
+      }, {threshold: 0.12});
+      blocks.forEach((el,i) => {
+        el.style.opacity = 0; el.style.transform = 'translateY(14px)'; el.style.transitionDelay = (i*60)+'ms'; io.observe(el);
+      });
+
+      // Badge subtle shimmer
+      const badges = document.querySelectorAll('#security .sec-badge');
+      badges.forEach(b => {
+        const shimmer = document.createElement('div');
+        shimmer.className = 'pointer-events-none absolute inset-0 rounded-2xl overflow-hidden';
+        shimmer.innerHTML = '<div class="absolute -left-full top-0 h-full w-1/3 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>';
+        b.style.position = 'relative';
+        b.appendChild(shimmer);
+        b.addEventListener('mouseenter', () => {
+          const bar = shimmer.firstChild;
+          bar.style.transition = 'transform .8s ease';
+          bar.style.transform = 'translateX(300%)';
+          setTimeout(()=> { bar.style.transition=''; bar.style.transform=''; }, 820);
+        });
+      });
+    })();
+
+    // ===== Residency pills
+    (function(){
+      const pills = document.querySelectorAll('#security .res-pill');
+      let active = 'us';
+      function apply(){
+        pills.forEach(p => {
+          const on = p.dataset.region === active;
+          p.style.borderColor = on ? 'rgba(79,123,255,.5)' : 'rgba(255,255,255,.1)';
+          p.style.boxShadow = on ? '0 0 0 1px rgba(79,123,255,.3), 0 8px 30px rgba(79,123,255,.2)' : 'none';
+        });
+      }
+      pills.forEach(p => p.addEventListener('click', () => { active = p.dataset.region; apply(); }));
+      apply();
+    })();
+
+    // ===== Retention slider
+    (function(){
+      const slider = document.getElementById('retSlider');
+      const label  = document.getElementById('retDays');
+      slider.addEventListener('input', () => label.textContent = slider.value);
+    })();
+
+    // ===== PII toggle (just visual feedback)
+    (function(){
+      const toggle = document.getElementById('piiToggle');
+      toggle.addEventListener('change', () => {
+        const on = toggle.checked;
+        const msg = on ? 'PII redaction enabled' : 'PII redaction disabled';
+        // simple toast
+        const t = document.createElement('div');
+        t.className = 'fixed bottom-5 left-1/2 -translate-x-1/2 bg-panel border border-white/10 rounded-xl px-4 py-2 text-xs text-sub shadow-glow';
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(()=> t.remove(), 1200);
+      });
+    })();
+
+    // ===== IP allowlist (mock UI)
+    (function(){
+      const input = document.getElementById('ipInput');
+      const add   = document.getElementById('ipAdd');
+      const list  = document.getElementById('ipList');
+
+      function chip(ip){
+        const el = document.createElement('span');
+        el.className = 'inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/10 border border-white/10';
+        el.innerHTML = '<span class="tabular-nums">'+ip+'</span><button class="text-sub hover:text-ink" aria-label="Remove IP">×</button>';
+        el.querySelector('button').addEventListener('click', ()=> el.remove());
+        return el;
+      }
+      add.addEventListener('click', () => {
+        const val = (input.value || '').trim();
+        if (!val) return;
+        list.appendChild(chip(val));
+        input.value = '';
+      });
+    })();
+
+    // ===== Tooltip for compliance matrix
+    (function(){
+      const tip = document.getElementById('secTooltip');
+      let visible = false;
+      document.querySelectorAll('#security .tiprow').forEach(row => {
+        row.addEventListener('mousemove', (e) => {
+          tip.textContent = row.dataset.tip || '';
+          tip.style.left = (e.clientX + 14) + 'px';
+          tip.style.top  = (e.clientY + 14) + 'px';
+          tip.style.opacity = 1;
+          visible = true;
+        });
+        row.addEventListener('mouseleave', () => { tip.style.opacity = 0; visible = false; });
+      });
+      window.addEventListener('scroll', () => { if (visible) tip.style.opacity = 0; });
+    })();
+  </script>
+</section>
+<!-- ===================== /SECTION 5 ===================== -->
+<!-- ======================= SECTION 6: DOCS & QUICKSTART ======================= -->
+<section id="docs" class="relative py-24 md:py-28 overflow-hidden">
+  <!-- Ambient glows -->
+  <div aria-hidden="true" class="pointer-events-none absolute -top-24 right-[-10%] w-[560px] h-[560px] rounded-full blur-3xl opacity-25"
+       style="background: radial-gradient(closest-side, rgba(90,124,255,.28), rgba(90,124,255,.10), transparent 70%);"></div>
+  <div aria-hidden="true" class="pointer-events-none absolute -bottom-28 left-[-10%] w-[600px] h-[600px] rounded-full blur-3xl opacity-15"
+       style="background: radial-gradient(closest-side, rgba(255,255,255,.08), rgba(255,255,255,.03), transparent 70%);"></div>
+
+  <div class="max-w-7xl mx-auto px-6">
+    <!-- Header -->
+    <div class="max-w-3xl">
+      <div class="inline-flex items-center text-xs text-sub border border-white/10 rounded-full px-3 py-1 mb-4 bg-panel/60 glass">
+        Docs & Quickstart
+      </div>
+      <h2 class="text-3xl md:text-5xl font-extrabold">Build in minutes. Scale with confidence.</h2>
+      <p class="mt-3 text-sub">Install the SDK, get your API key, and run your first evaluation. Examples included.</p>
+    </div>
+
+    <!-- Layout: Sticky TOC (desktop) + Content -->
+    <div class="mt-10 grid lg:grid-cols-[260px_1fr] gap-8">
+      <!-- TOC -->
+      <aside class="hidden lg:block sticky top-24 self-start">
+        <nav class="text-sm" aria-label="Docs navigation">
+          <ul class="space-y-2">
+            <li><a href="#docs-installation" class="docs-toc link-underline hover:text-brand-soft">Installation</a></li>
+            <li><a href="#docs-sdk"         class="docs-toc link-underline hover:text-brand-soft">SDK</a></li>
+            <li><a href="#docs-quickstart"  class="docs-toc link-underline hover:text-brand-soft">Quickstart</a></li>
+            <li><a href="#docs-cli"         class="docs-toc link-underline hover:text-brand-soft">CLI</a></li>
+            <li><a href="#docs-examples"    class="docs-toc link-underline hover:text-brand-soft">Examples</a></li>
+          </ul>
+        </nav>
+      </aside>
+
+      <!-- Content -->
+      <div class="space-y-16">
+        <!-- ============ Installation ============ -->
+        <section id="docs-installation" class="bg-panel border border-white/10 rounded-3xl p-6 reveal">
+          <div class="flex items-center justify-between flex-wrap gap-4">
+            <h3 class="text-xl md:text-2xl font-extrabold">Installation</h3>
+            <div class="inline-flex items-center gap-2 text-xs text-sub">
+              <span class="inline-flex items-center gap-2 rounded-full px-3 py-1 bg-white/5 border border-white/10">
+                <span class="h-2.5 w-2.5 rounded-full bg-success"></span> Stable
+              </span>
+              <span class="inline-flex items-center gap-2 rounded-full px-3 py-1 bg-white/5 border border-white/10">
+                v<span class="tabular-nums">1.2.3</span>
+              </span>
+            </div>
+          </div>
+
+          <p class="mt-2 text-sub">Add NeuroLaunch to your app via PyPI or npm. Then initialize the client with your API key.</p>
+
+          <div class="mt-6 grid md:grid-cols-2 gap-6">
+            <div>
+              <div class="text-sm font-semibold mb-2">Python</div>
+              <div class="bg-black/40 rounded-2xl border border-white/10 p-4 relative">
+                <button class="docs-copy absolute top-3 right-3 text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#docs-pip">Copy</button>
+                <pre id="docs-pip" class="font-mono text-sm whitespace-pre-wrap"><span class="token-kw">pip</span> install neurolaunch</pre>
+              </div>
+            </div>
+            <div>
+              <div class="text-sm font-semibold mb-2">JavaScript</div>
+              <div class="bg-black/40 rounded-2xl border border-white/10 p-4 relative">
+                <button class="docs-copy absolute top-3 right-3 text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#docs-npm">Copy</button>
+                <pre id="docs-npm" class="font-mono text-sm whitespace-pre-wrap"><span class="token-kw">npm</span> i neurolaunch</pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6">
+            <div class="text-sm font-semibold mb-2">Initialize</div>
+            <div class="bg-black/40 rounded-2xl border border-white/10 p-4 relative">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex gap-2 text-xs">
+                  <button data-docstab="py-init"   class="docs-tab-active border-b-2 px-3 py-1 rounded-t-md">Python</button>
+                  <button data-docstab="js-init"   class="docs-tab border-b-2 px-3 py-1 rounded-t-md hover:text-ink">JavaScript</button>
+                  <button data-docstab="curl-init" class="docs-tab border-b-2 px-3 py-1 rounded-t-md hover:text-ink">cURL</button>
+                </div>
+                <button class="docs-copy text-xs text-sub hover:text-ink border border-white/10 rounded-md px-3 py-1" data-target="#init_py">Copy</button>
+              </div>
+
+              <pre id="init_py"   class="docs-pane block  font-mono text-sm leading-relaxed text-ink/90 whitespace-pre-wrap bg-black/30 rounded-xl p-3"><span class="token-kw">import</span> neurolaunch <span class="token-kw">as</span> nl
+nl.<span class="token-fn">init</span>(api_key=<span class="token-str">"NL_KEY"</span>)</pre>
+              <pre id="init_js"   class="docs-pane hidden font-mono text-sm leading-relaxed text-ink/90 whitespace-pre-wrap bg-black/30 rounded-xl p-3"><span class="token-kw">import</span> nl <span class="token-kw">from</span> <span class="token-str">'neurolaunch'</span>;
+nl.<span class="token-fn">init</span>({ apiKey: <span class="token-str">'NL_KEY'</span> });</pre>
+              <pre id="init_curl" class="docs-pane hidden font-mono text-sm leading-relaxed text-ink/90 whitespace-pre-wrap bg-black/30 rounded-xl p-3">curl -H <span class="token-str">'Authorization: Bearer NL_KEY'</span> https://api.neurolaunch.ai/v1/ping</pre>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ SDK ============ -->
+        <section id="docs-sdk" class="bg-panel border border-white/10 rounded-3xl p-6 reveal">
+          <div class="flex items-center justify-between flex-wrap gap-4">
+            <h3 class="text-xl md:text-2xl font-extrabold">SDK</h3>
+            <a href="#changelog" class="text-xs link-underline hover:text-brand-soft">Changelog →</a>
+          </div>
+          <p class="mt-2 text-sub">Track prompts, run evaluations, and guard rollouts. Choose your language:</p>
+
+          <!-- Tabs -->
+          <div class="mt-4 bg-black/30 rounded-2xl border border-white/10 p-4 relative">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex gap-2 text-xs">
+                <button data-docstab="py-sdk"   class="docs-tab-active border-b-2 px-3 py-1 rounded-t-md">Python</button>
+                <button data-docstab="js-sdk"   class="docs-tab        border-b-2 px-3 py-1 rounded-t-md hover:text-ink">JavaScript</button>
+                <button data-docstab="curl-sdk" class="docs-tab        border-b-2 px-3 py-1 rounded-t-md hover:text-ink">cURL</button>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-xs text-sub flex items-center gap-2 cursor-pointer">
+                  <input id="sdkType" type="checkbox" class="sr-only peer">
+                  <span class="inline-block w-12 h-6 bg-white/10 border border-white/10 rounded-full relative after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:bg-brand peer-checked:after:translate-x-6"></span>
+                  <span>Typewriter</span>
+                </label>
+                <button class="docs-copy text-xs text-sub hover:text-ink border border-white/10 rounded-md px-3 py-1" data-target="#sdk_py">Copy</button>
+              </div>
+            </div>
+
+            <!-- Panes -->
+            <pre id="sdk_py"   class="docs-pane block  font-mono text-sm leading-relaxed text-ink/90 whitespace-pre-wrap bg-black/30 rounded-xl p-3"></pre>
+            <pre id="sdk_js"   class="docs-pane hidden font-mono text-sm leading-relaxed text-ink/90 whitespace-pre-wrap bg-black/30 rounded-xl p-3"></pre>
+            <pre id="sdk_curl" class="docs-pane hidden font-mono text-sm leading-relaxed text-ink/90 whitespace-pre-wrap bg-black/30 rounded-xl p-3"></pre>
+          </div>
+        </section>
+
+        <!-- ============ Quickstart ============ -->
+        <section id="docs-quickstart" class="bg-panel border border-white/10 rounded-3xl p-6 reveal">
+          <div class="flex items-center justify-between flex-wrap gap-4">
+            <h3 class="text-xl md:text-2xl font-extrabold">Quickstart</h3>
+            <a href="#cta" class="text-xs link-underline hover:text-brand-soft">Get your API key →</a>
+          </div>
+          <p class="mt-2 text-sub">Run an eval on a golden dataset. If it passes thresholds, roll out to 20% of traffic.</p>
+
+          <ol class="mt-6 grid lg:grid-cols-3 gap-6 text-sm">
+            <li class="bg-black/30 border border-white/10 rounded-2xl p-4">
+              <div class="text-xs text-sub mb-1">Step 1</div>
+              <div class="font-semibold">Create a dataset</div>
+              <pre class="mt-2 font-mono bg-black/30 rounded-xl p-3 whitespace-pre-wrap text-ink/90"><span class="token-kw">nl</span> dataset <span class="token-fn">create</span> <span class="token-str">support_tickets_golden</span> --labelled</pre>
+            </li>
+            <li class="bg-black/30 border border-white/10 rounded-2xl p-4">
+              <div class="text-xs text-sub mb-1">Step 2</div>
+              <div class="font-semibold">Run evaluation</div>
+              <pre class="mt-2 font-mono bg-black/30 rounded-xl p-3 whitespace-pre-wrap text-ink/90"><span class="token-kw">nl</span> eval <span class="token-str">support_tickets_golden</span> --metrics <span class="token-str">task_success,toxicity,latency_ms,cost_usd</span></pre>
+            </li>
+            <li class="bg-black/30 border border-white/10 rounded-2xl p-4">
+              <div class="text-xs text-sub mb-1">Step 3</div>
+              <div class="font-semibold">Gate rollout</div>
+              <pre class="mt-2 font-mono bg-black/30 rounded-xl p-3 whitespace-pre-wrap text-ink/90"><span class="token-kw">nl</span> rollout <span class="token-str">v19</span> --to <span class="token-str">20%</span> --threshold <span class="token-str">task_success>=0.85</span></pre>
+            </li>
+          </ol>
+
+          <!-- Diff viewer -->
+          <div class="mt-8">
+            <div class="flex items-center justify-between">
+              <div class="font-semibold">Prompt diff (v18 → v19)</div>
+              <label class="text-xs text-sub flex items-center gap-2 cursor-pointer">
+                <input id="diffToggle" type="checkbox" class="sr-only peer">
+                <span class="inline-block w-12 h-6 bg-white/10 border border-white/10 rounded-full relative after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:bg-brand peer-checked:after:translate-x-6"></span>
+                <span>Show diff</span>
+              </label>
+            </div>
+
+            <div class="mt-4 grid md:grid-cols-2 gap-4">
+              <div class="bg-black/30 rounded-2xl p-4 border border-white/10">
+                <div class="text-xs text-sub mb-2">v18‑cot</div>
+                <pre id="v18" class="font-mono text-sm whitespace-pre-wrap">"You are a helpful agent. Extract intent and sentiment.
+Return a concise answer."</pre>
+              </div>
+              <div class="bg-black/30 rounded-2xl p-4 border border-white/10">
+                <div class="text-xs text-sub mb-2">v19</div>
+                <pre id="v19" class="font-mono text-sm whitespace-pre-wrap">"You are a structured assistant. Return JSON:
+{ intent, sentiment, priority }"</pre>
+              </div>
+            </div>
+
+            <div class="mt-3 text-xs text-sub">Toggle “Show diff” to highlight line additions/changes.</div>
+          </div>
+        </section>
+
+        <!-- ============ CLI ============ -->
+        <section id="docs-cli" class="bg-panel border border-white/10 rounded-3xl p-6 reveal">
+          <div class="flex items-center justify-between flex-wrap gap-4">
+            <h3 class="text-xl md:text-2xl font-extrabold">CLI</h3>
+            <a href="#changelog" class="text-xs link-underline hover:text-brand-soft">Release notes →</a>
+          </div>
+          <p class="mt-2 text-sub">Automate evaluations, rollouts, and exports in CI.</p>
+
+          <div class="mt-4 grid md:grid-cols-2 gap-6">
+            <div class="bg-black/30 rounded-2xl border border-white/10 p-4 relative">
+              <button class="docs-copy absolute top-3 right-3 text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#cli-install">Copy</button>
+              <div class="text-sm font-semibold">Install</div>
+              <pre id="cli-install" class="mt-2 font-mono text-sm whitespace-pre-wrap"><span class="token-kw">pip</span> install neurolaunch-cli</pre>
+            </div>
+            <div class="bg-black/30 rounded-2xl border border-white/10 p-4 relative">
+              <button class="docs-copy absolute top-3 right-3 text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#cli-run">Copy</button>
+              <div class="text-sm font-semibold">Run in CI</div>
+              <pre id="cli-run" class="mt-2 font-mono text-sm whitespace-pre-wrap">NL_KEY=<span class="token-str">$NL_KEY</span> nl eval <span class="token-str">support_tickets_golden</span> --out <span class="token-str">results.json</span></pre>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ Examples ============ -->
+        <section id="docs-examples" class="bg-panel border border-white/10 rounded-3xl p-6 reveal">
+          <div class="flex items-center justify-between flex-wrap gap-4">
+            <h3 class="text-xl md:text-2xl font-extrabold">Examples</h3>
+            <div class="flex items-center gap-2">
+              <input id="exSearch" type="search" placeholder="Search examples…"
+                     class="rounded-xl bg-black/30 border border-white/10 px-3 py-1.5 text-xs text-ink placeholder:text-sub focus:outline-none focus:ring-2 focus:ring-brand/40" />
+              <div class="hidden md:block text-xs text-sub">Filter:</div>
+              <div class="flex items-center gap-2">
+                <button class="ex-pill px-2 py-1 rounded-full text-xs bg-white/10 hover:bg-white/15 border border-white/10" data-excat="all" aria-selected="true">All</button>
+                <button class="ex-pill px-2 py-1 rounded-full text-xs bg-white/10 hover:bg-white/15 border border-white/10" data-excat="python">Python</button>
+                <button class="ex-pill px-2 py-1 rounded-full text-xs bg-white/10 hover:bg-white/15 border border-white/10" data-excat="javascript">JavaScript</button>
+                <button class="ex-pill px-2 py-1 rounded-full text-xs bg-white/10 hover:bg-white/15 border border-white/10" data-excat="curl">cURL</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-6" id="exGrid" aria-live="polite">
+            <!-- Example cards -->
+            <article class="ex-card bg-black/30 border border-white/10 rounded-2xl p-4" data-excat="python" data-tags="eval dataset metrics">
+              <div class="text-xs text-sub">Python</div>
+              <h4 class="font-semibold mt-1">Run eval with thresholds</h4>
+              <pre class="mt-2 font-mono text-sm whitespace-pre-wrap">run = nl.<span class="token-fn">eval</span>(dataset=<span class="token-str">"support_tickets_golden"</span>, metrics=[<span class="token-str">"task_success"</span>])
+<span class="token-kw">if</span> run.<span class="token-fn">passes</span>({<span class="token-str">"task_success"</span>: <span class="token-num">0.85</span>}): nl.<span class="token-fn">rollout</span>(prompt_version=<span class="token-str">"v19"</span>, to=<span class="token-str">"20%"</span>)</pre>
+            </article>
+
+            <article class="ex-card bg-black/30 border border-white/10 rounded-2xl p-4" data-excat="javascript" data-tags="track log prompt">
+              <div class="text-xs text-sub">JavaScript</div>
+              <h4 class="font-semibold mt-1">Track prompts & responses</h4>
+              <pre class="mt-2 font-mono text-sm whitespace-pre-wrap"><span class="token-kw">import</span> nl <span class="token-kw">from</span> <span class="token-str">'neurolaunch'</span>;
+nl.<span class="token-fn">track</span>({ prompt: <span class="token-str">'Summarize the ticket'</span>, response: <span class="token-str">'...'</span>, tags: [<span class="token-str">'support'</span>] });</pre>
+            </article>
+
+            <article class="ex-card bg-black/30 border border-white/10 rounded-2xl p-4" data-excat="curl" data-tags="api http">
+              <div class="text-xs text-sub">cURL</div>
+              <h4 class="font-semibold mt-1">Call API directly</h4>
+              <pre class="mt-2 font-mono text-sm whitespace-pre-wrap">curl -H <span class="token-str">'Authorization: Bearer NL_KEY'</span> \
+  -H <span class="token-str">'Content-Type: application/json'</span> \
+  -d <span class="token-str">'{"dataset":"support_tickets_golden"}'</span> \
+  https://api.neurolaunch.ai/eval</pre>
+            </article>
+
+            <article class="ex-card bg-black/30 border border-white/10 rounded-2xl p-4" data-excat="python" data-tags="guards slo rollback">
+              <div class="text-xs text-sub">Python</div>
+              <h4 class="font-semibold mt-1">Guardrails & auto‑rollback</h4>
+              <pre class="mt-2 font-mono text-sm whitespace-pre-wrap"><span class="token-kw">if</span> run.<span class="token-fn">violates</span>({<span class="token-str">"latency_ms"</span>: <span class="token-num">500</span>}): nl.<span class="token-fn">rollback</span>()</pre>
+            </article>
+
+            <article class="ex-card bg-black/30 border border-white/10 rounded-2xl p-4" data-excat="javascript" data-tags="ab test rollout">
+              <div class="text-xs text-sub">JavaScript</div>
+              <h4 class="font-semibold mt-1">A/B in production</h4>
+              <pre class="mt-2 font-mono text-sm whitespace-pre-wrap"><span class="token-kw">await</span> nl.<span class="token-fn">abTest</span>({ a: <span class="token-str">'v18'</span>, b: <span class="token-str">'v19'</span>, metric: <span class="token-str">'task_success'</span> })</pre>
+            </article>
+
+            <article class="ex-card bg-black/30 border border-white/10 rounded-2xl p-4" data-excat="curl" data-tags="export results">
+              <div class="text-xs text-sub">cURL</div>
+              <h4 class="font-semibold mt-1">Export results</h4>
+              <pre class="mt-2 font-mono text-sm whitespace-pre-wrap">curl -H <span class="token-str">'Authorization: Bearer NL_KEY'</span> \
+  https://api.neurolaunch.ai/eval/<span class="token-str">342</span>/export</pre>
+            </article>
+          </div>
+
+          <div class="mt-8 flex flex-wrap items-center gap-6 text-sm">
+            <a href="#cta" class="inline-flex items-center rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold shadow-glow">Get API key</a>
+            <a href="#changelog" class="link-underline hover:text-brand-soft">See full changelog</a>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section scripts (self-contained) -->
+  <script>
+    // ===== Scroll reveal
+    (function(){
+      const els = document.querySelectorAll('#docs .reveal');
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.style.transition = 'transform .6s cubic-bezier(.2,.8,.2,1), opacity .6s ease';
+            e.target.style.opacity = 1;
+            e.target.style.transform = 'translateY(0)';
+            io.unobserve(e.target);
+          }
+        });
+      }, {threshold: 0.12});
+      els.forEach((el,i) => {
+        el.style.opacity = 0; el.style.transform = 'translateY(16px)'; el.style.transitionDelay=(i*80)+'ms'; io.observe(el);
+      });
+    })();
+
+    // ===== Copy buttons
+    (function(){
+      document.querySelectorAll('#docs .docs-copy').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = document.querySelector(btn.dataset.target);
+          if (!target) return;
+          const text = target.innerText.replace(/\u00A0/g, ' ');
+          navigator.clipboard.writeText(text).then(() => {
+            const old = btn.textContent; btn.textContent = 'Copied!'; setTimeout(()=> btn.textContent = old, 900);
+          });
+        });
+      });
+    })();
+
+    // ===== Init tabs (Installation)
+    (function(){
+      const tabs = document.querySelectorAll('#docs [data-docstab]');
+      function show(id){
+        document.querySelectorAll('#docs .docs-pane').forEach(p => p.classList.add('hidden'));
+        document.getElementById(id.replace('-init','').replace('-sdk',''))?.classList.remove('hidden'); // fallback
+        const map = {
+          'py-init':'init_py','js-init':'init_js','curl-init':'init_curl',
+          'py-sdk':'sdk_py','js-sdk':'sdk_js','curl-sdk':'sdk_curl'
+        };
+        const pane = document.getElementById(map[id]);
+        if (pane){ document.querySelectorAll('#docs .docs-pane').forEach(p=>p.classList.add('hidden')); pane.classList.remove('hidden'); }
+        tabs.forEach(b => { b.classList.remove('docs-tab-active'); b.classList.add('docs-tab'); });
+        document.querySelector(`#docs [data-docstab="${id}"]`).classList.add('docs-tab-active');
+        document.querySelector(`#docs [data-docstab="${id}"]`).classList.remove('docs-tab');
+      }
+      tabs.forEach(b => b.addEventListener('click', ()=> show(b.dataset.docstab)));
+    })();
+
+    // ===== SDK typewriter + code content
+    (function(){
+      const sdkPy = `<span class="token-kw">import</span> neurolaunch <span class="token-kw">as</span> nl
+nl.<span class="token-fn">init</span>(api_key=<span class="token-str">'NL_KEY'</span>)
+
+nl.<span class="token-fn">track</span>(prompt=<span class="token-str">'Summarize the ticket'</span>, response=<span class="token-str">'...'</span>, tags=[<span class="token-str">'support'</span>])
+
+run = nl.<span class="token-fn">eval</span>(
+  dataset=<span class="token-str">'support_tickets_golden'</span>,
+  metrics=[<span class="token-str">'task_success'</span>, <span class="token-str">'toxicity'</span>, <span class="token-str">'latency_ms'</span>, <span class="token-str">'cost_usd'</span>]
+)
+<span class="token-kw">if</span> run.<span class="token-fn">passes</span>({<span class="token-str">'task_success'</span>: <span class="token-num">0.85</span>}):
+  nl.<span class="token-fn">rollout</span>(prompt_version=<span class="token-str">'v19'</span>, to=<span class="token-str">'20%'</span>)`;
+
+      const sdkJs = `<span class="token-kw">import</span> nl <span class="token-kw">from</span> <span class="token-str">'neurolaunch'</span>;
+nl.<span class="token-fn">init</span>({ apiKey: <span class="token-str">'NL_KEY'</span> });
+
+nl.<span class="token-fn">track</span>({ prompt: <span class="token-str">'Summarize the ticket'</span>, response: <span class="token-str">'...'</span>, tags: [<span class="token-str">'support'</span>] });
+
+<span class="token-kw">const</span> run = <span class="token-kw">await</span> nl.<span class="token-fn">eval</span>({
+  dataset: <span class="token-str">'support_tickets_golden'</span>,
+  metrics: [<span class="token-str">'task_success'</span>, <span class="token-str">'toxicity'</span>, <span class="token-str">'latency_ms'</span>, <span class="token-str">'cost_usd'</span>]
+});
+<span class="token-kw">if</span> (run.passes({ task_success: <span class="token-num">0.85</span> })) {
+  <span class="token-kw">await</span> nl.<span class="token-fn">rollout</span>({ promptVersion: <span class="token-str">'v19'</span>, to: <span class="token-str">'20%'</span> });
+}`;
+
+      const sdkCurl = `curl -X POST <span class="token-str">'https://api.neurolaunch.ai/eval'</span> \\
+ -H <span class="token-str">'Authorization: Bearer NL_KEY'</span> \\
+ -H <span class="token-str">'Content-Type: application/json'</span> \\
+ -d <span class="token-str">'{"dataset":"support_tickets_golden","metrics":["task_success","toxicity","latency_ms","cost_usd"]}'</span>`;
+
+      const panes = {
+        py:   document.querySelector('#sdk_py'),
+        js:   document.querySelector('#sdk_js'),
+        curl: document.querySelector('#sdk_curl')
+      };
+      const toggle = document.getElementById('sdkType');
+
+      function typewriter(el, html, speed=10) {
+        el.innerHTML = ""; let i=0;
+        const tick = () => {
+          el.innerHTML = html.slice(0, i++) + '<span class="opacity-50">|</span>';
+          if (i <= html.length) requestAnimationFrame(tick);
+          else el.innerHTML = html;
+        };
+        tick();
+      }
+      // default content
+      panes.py.innerHTML = sdkPy;
+      panes.js.innerHTML = sdkJs;
+      panes.curl.innerHTML = sdkCurl;
+
+      // Tab change handler (re-use from init tabs)
+      document.querySelectorAll('#docs [data-docstab]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.docstab;
+          if (id === 'py-sdk')   toggle.checked ? typewriter(panes.py, sdkPy)   : panes.py.innerHTML = sdkPy;
+          if (id === 'js-sdk')   toggle.checked ? typewriter(panes.js, sdkJs)   : panes.js.innerHTML = sdkJs;
+          if (id === 'curl-sdk') toggle.checked ? typewriter(panes.curl, sdkCurl): panes.curl.innerHTML = sdkCurl;
+        });
+      });
+      toggle.addEventListener('change', () => {
+        // retrigger current active pane animation
+        const active = document.querySelector('#docs [data-docstab].docs-tab-active')?.dataset.docstab || 'py-sdk';
+        document.querySelector(`#docs [data-docstab="${active}"]`)?.click();
+      });
+      // Kick off default typing if toggle is on by default (it isn't)
+    })();
+
+    // ===== Diff toggle (simple line highlight)
+    (function(){
+      const on  = document.getElementById('diffToggle');
+      const v18 = document.getElementById('v18');
+      const v19 = document.getElementById('v19');
+      function apply(){
+        if (on.checked) {
+          v18.innerHTML = v18.innerText.replace('Return a concise answer.', '<span style="background:rgba(239,68,68,.18);padding:0 2px;border-radius:4px;">Return a concise answer.</span>');
+          v19.innerHTML = v19.innerText.replace('{ intent, sentiment, priority }', '<span style="background:rgba(34,197,94,.20);padding:0 2px;border-radius:4px;">{ intent, sentiment, priority }</span>');
+        } else {
+          v18.textContent = v18.innerText; v19.textContent = v19.innerText;
+          v18.textContent = `"You are a helpful agent. Extract intent and sentiment.\nReturn a concise answer."`;
+          v19.textContent = `"You are a structured assistant. Return JSON:\n{ intent, sentiment, priority }"`;
+        }
+      }
+      on.addEventListener('change', apply);
+    })();
+
+    // ===== Examples filter & search
+    (function(){
+      const pills = document.querySelectorAll('#docs .ex-pill');
+      const cards = Array.from(document.querySelectorAll('#docs #exGrid .ex-card'));
+      const search= document.getElementById('exSearch');
+      let cat = 'all';
+      function apply(){
+        const q = (search.value||'').toLowerCase().trim();
+        cards.forEach(c => {
+          const matchCat = (cat==='all') || (c.dataset.excat===cat);
+          const text = (c.dataset.tags + ' ' + c.innerText).toLowerCase();
+          const matchTxt = !q || text.includes(q);
+          c.style.display = (matchCat && matchTxt) ? '' : 'none';
+        });
+      }
+      pills.forEach(p => p.addEventListener('click', () => {
+        pills.forEach(x => x.setAttribute('aria-selected','false'));
+        p.setAttribute('aria-selected','true');
+        cat = p.dataset.excat; apply();
+      }));
+      search.addEventListener('input', apply);
+      apply();
+    })();
+
+    // ===== TOC active state on scroll
+    (function(){
+      const links = Array.from(document.querySelectorAll('#docs .docs-toc'));
+      const ids   = links.map(a => document.querySelector(a.getAttribute('href')));
+      function onScroll(){
+        let idx = 0;
+        for (let i=0; i<ids.length; i++){
+          const rect = ids[i]?.getBoundingClientRect();
+          if (rect && rect.top < window.innerHeight * .3) idx = i;
+        }
+        links.forEach(l => l.classList.remove('text-brand-soft'));
+        links[idx]?.classList.add('text-brand-soft');
+      }
+      document.addEventListener('scroll', onScroll, { passive:true });
+      onScroll();
+    })();
+  </script>
+</section>
+<!-- ===================== /SECTION 6 ===================== -->
+<!-- ======================= SECTION 7: CHANGELOG / WHAT'S NEW ======================= -->
+<section id="changelog" class="relative py-24 md:py-28 overflow-hidden">
+  <!-- Ambient glows -->
+  <div aria-hidden="true" class="pointer-events-none absolute -top-24 right-[-10%] w-[560px] h-[560px] rounded-full blur-3xl opacity-20"
+       style="background: radial-gradient(closest-side, rgba(90,124,255,.25), rgba(90,124,255,.08), transparent 70%);"></div>
+  <div aria-hidden="true" class="pointer-events-none absolute -bottom-28 left-[-10%] w-[600px] h-[600px] rounded-full blur-3xl opacity-15"
+       style="background: radial-gradient(closest-side, rgba(255,255,255,.08), rgba(255,255,255,.03), transparent 70%);"></div>
+
+  <div class="max-w-7xl mx-auto px-6">
+    <!-- Header -->
+    <div class="max-w-3xl">
+      <div class="inline-flex items-center text-xs text-sub border border-white/10 rounded-full px-3 py-1 mb-4 bg-panel/60 glass">
+        What’s New
+      </div>
+      <h2 class="text-3xl md:text-5xl font-extrabold">Changelog & release notes.</h2>
+      <p class="mt-3 text-sub">Track product updates, SDK releases, CLI changes, and security notes. Filter, search, and deep‑link any entry.</p>
+    </div>
+
+    <!-- Controls -->
+    <div class="mt-8 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+      <div class="flex flex-wrap items-center gap-2" role="tablist" aria-label="Changelog filters">
+        <button class="cl-pill px-3 py-1.5 rounded-full text-sm bg-white/10 hover:bg-white/15 border border-white/10" data-cl="all" aria-selected="true">All</button>
+        <button class="cl-pill px-3 py-1.5 rounded-full text-sm bg-white/10 hover:bg-white/15 border border-white/10" data-cl="product">Product</button>
+        <button class="cl-pill px-3 py-1.5 rounded-full text-sm bg-white/10 hover:bg-white/15 border border-white/10" data-cl="sdk">SDK</button>
+        <button class="cl-pill px-3 py-1.5 rounded-full text-sm bg-white/10 hover:bg-white/15 border border-white/10" data-cl="cli">CLI</button>
+        <button class="cl-pill px-3 py-1.5 rounded-full text-sm bg-white/10 hover:bg-white/15 border border-white/10" data-cl="security">Security</button>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="relative w-64">
+          <input id="clSearch" type="search" placeholder="Search releases…"
+                 class="w-full rounded-2xl bg-panel border border-white/10 px-4 py-2.5 text-sm text-ink placeholder:text-sub focus:outline-none focus:ring-2 focus:ring-brand/50" />
+          <svg class="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-sub" fill="none" stroke="currentColor">
+            <path stroke-width="2" stroke-linecap="round" d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/>
+          </svg>
+        </div>
+        <a href="#cta" class="hidden md:inline-flex items-center rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold shadow-glow">Subscribe</a>
+        <a href="#" class="hidden md:inline text-sm link-underline hover:text-brand-soft">RSS</a>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="mt-10 relative">
+      <!-- vertical line -->
+      <div aria-hidden="true" class="absolute left-[18px] top-0 bottom-0 w-px bg-white/10"></div>
+
+      <div id="clList" class="space-y-6">
+        <!-- ========== Entry Template Examples (Newest first) ========== -->
+
+        <!-- Release 2025-07-31 -->
+        <article id="release-2025-07-31" class="cl-entry bg-panel border border-white/10 rounded-3xl p-5 pl-14 relative reveal" data-cl="product sdk" data-tags="guarded rollouts rollback thresholds studio versioning">
+          <!-- dot -->
+          <span aria-hidden="true" class="absolute left-2 top-6 h-4 w-4 rounded-full bg-brand shadow-glow"></span>
+
+          <header class="flex flex-wrap items-center gap-2">
+            <time datetime="2025-07-31" class="text-xs text-sub">July 31, 2025</time>
+            <span class="h-4 w-px bg-white/10"></span>
+            <a href="#release-2025-07-31" class="text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">v1.2.3</a>
+            <span class="h-4 w-px bg-white/10"></span>
+            <span class="badge text-xs rounded-full px-2 py-1 bg-success/20 text-success border border-success/30">New</span>
+            <span class="badge text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">Product</span>
+            <span class="badge text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">SDK</span>
+            <button class="ml-auto cl-copy text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#release-2025-07-31">Copy link</button>
+          </header>
+
+          <h3 class="mt-2 text-lg font-semibold">Guarded rollouts with automatic rollback</h3>
+          <p class="mt-1 text-sub text-sm">Define thresholds across success, latency, cost, and toxicity. If a new prompt violates SLOs during rollout, NeuroLaunch automatically rolls back and alerts your team.</p>
+
+          <details class="mt-3 group">
+            <summary class="flex items-center justify-between cursor-pointer list-none">
+              <span class="text-sm font-semibold">See SDK usage</span>
+              <span class="text-sub group-open:rotate-180 transition">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor"><path stroke-width="2" d="M6 9l6 6 6-6"/></svg>
+              </span>
+            </summary>
+            <div class="mt-3 grid md:grid-cols-2 gap-4">
+              <div class="bg-black/30 rounded-2xl border border-white/10 p-3 relative">
+                <button class="docs-copy absolute top-3 right-3 text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#cl-code-py-123">Copy</button>
+                <div class="text-xs text-sub mb-1">Python</div>
+                <pre id="cl-code-py-123" class="font-mono text-sm whitespace-pre-wrap"><span class="token-kw">import</span> neurolaunch <span class="token-kw">as</span> nl
+run = nl.<span class="token-fn">eval</span>(dataset=<span class="token-str">'support_tickets_golden'</span>, metrics=[<span class="token-str">'task_success'</span>,<span class="token-str">'latency_ms'</span>])
+<span class="token-kw">if</span> run.<span class="token-fn">passes</span>({<span class="token-str">'task_success'</span>:<span class="token-num">0.85</span>}):
+  nl.<span class="token-fn">rollout</span>(prompt_version=<span class="token-str">'v19'</span>, to=<span class="token-str">'20%'</span>)
+<span class="token-kw">else</span>:
+  nl.<span class="token-fn">rollback</span>()</pre>
+              </div>
+              <div class="bg-black/30 rounded-2xl border border-white/10 p-3 relative">
+                <button class="docs-copy absolute top-3 right-3 text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#cl-code-js-123">Copy</button>
+                <div class="text-xs text-sub mb-1">JavaScript</div>
+                <pre id="cl-code-js-123" class="font-mono text-sm whitespace-pre-wrap"><span class="token-kw">import</span> nl <span class="token-kw">from</span> <span class="token-str">'neurolaunch'</span>;
+<span class="token-kw">const</span> run = <span class="token-kw">await</span> nl.<span class="token-fn">eval</span>({ dataset: <span class="token-str">'support_tickets_golden'</span>, metrics:[<span class="token-str">'task_success'</span>] });
+<span class="token-kw">if</span> (run.passes({ task_success:<span class="token-num">0.85</span> })) {
+  <span class="token-kw">await</span> nl.<span class="token-fn">rollout</span>({ promptVersion:<span class="token-str">'v19'</span>, to:<span class="token-str">'20%'</span> });
+} <span class="token-kw">else</span> {
+  <span class="token-kw">await</span> nl.<span class="token-fn">rollback</span>();
+}</pre>
+              </div>
+            </div>
+          </details>
+        </article>
+
+        <!-- Release 2025-07-24 -->
+        <article id="release-2025-07-24" class="cl-entry bg-panel border border-white/10 rounded-3xl p-5 pl-14 relative reveal" data-cl="sdk cli" data-tags="sdk typescript typings cli ci">
+          <span aria-hidden="true" class="absolute left-2 top-6 h-4 w-4 rounded-full bg-brand/70"></span>
+          <header class="flex flex-wrap items-center gap-2">
+            <time datetime="2025-07-24" class="text-xs text-sub">July 24, 2025</time>
+            <span class="h-4 w-px bg-white/10"></span>
+            <a href="#release-2025-07-24" class="text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">v1.2.0</a>
+            <span class="h-4 w-px bg-white/10"></span>
+            <span class="badge text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">SDK</span>
+            <span class="badge text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">CLI</span>
+            <button class="ml-auto cl-copy text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#release-2025-07-24">Copy link</button>
+          </header>
+          <h3 class="mt-2 text-lg font-semibold">TypeScript typings + improved CLI exit codes</h3>
+          <ul class="mt-1 text-sub text-sm list-disc list-inside space-y-1">
+            <li>Added complete TS typings for <code class="font-mono">nl.eval</code>, <code class="font-mono">rollout</code>, and <code class="font-mono">track</code>.</li>
+            <li>CLI returns non‑zero on threshold failures for cleaner CI gating.</li>
+          </ul>
+        </article>
+
+        <!-- Release 2025-07-10 -->
+        <article id="release-2025-07-10" class="cl-entry bg-panel border border-white/10 rounded-3xl p-5 pl-14 relative reveal" data-cl="product" data-tags="studio datasets golden sets compare models dashboards">
+          <span aria-hidden="true" class="absolute left-2 top-6 h-4 w-4 rounded-full bg-brand/50"></span>
+          <header class="flex flex-wrap items-center gap-2">
+            <time datetime="2025-07-10" class="text-xs text-sub">July 10, 2025</time>
+            <span class="h-4 w-px bg-white/10"></span>
+            <a href="#release-2025-07-10" class="text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">Studio</a>
+            <span class="h-4 w-px bg-white/10"></span>
+            <span class="badge text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">Improved</span>
+            <span class="badge text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">Product</span>
+            <button class="ml-auto cl-copy text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#release-2025-07-10">Copy link</button>
+          </header>
+          <h3 class="mt-2 text-lg font-semibold">Eval Studio: model compare & golden set tools</h3>
+          <p class="mt-1 text-sub text-sm">Side‑by‑side model compare, dataset builder UX, and labeled sample import from CSV or Snowflake.</p>
+        </article>
+
+        <!-- Security Advisory -->
+        <article id="release-2025-06-30" class="cl-entry bg-panel border border-white/10 rounded-3xl p-5 pl-14 relative reveal" data-cl="security" data-tags="security advisory dependency update">
+          <span aria-hidden="true" class="absolute left-2 top-6 h-4 w-4 rounded-full bg-[#F59E0B]"></span>
+          <header class="flex flex-wrap items-center gap-2">
+            <time datetime="2025-06-30" class="text-xs text-sub">June 30, 2025</time>
+            <span class="h-4 w-px bg-white/10"></span>
+            <a href="#release-2025-06-30" class="text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">Advisory</a>
+            <span class="h-4 w-px bg-white/10"></span>
+            <span class="badge text-xs rounded-full px-2 py-1 bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">Security</span>
+            <button class="ml-auto cl-copy text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#release-2025-06-30">Copy link</button>
+          </header>
+          <h3 class="mt-2 text-lg font-semibold">Dependency patch for evaluator sandbox</h3>
+          <p class="mt-1 text-sub text-sm">Updated sandbox dependencies and tightened execution policy. No customer action required.</p>
+          <details class="mt-3 group">
+            <summary class="flex items-center justify-between cursor-pointer list-none">
+              <span class="text-sm font-semibold">Technical details</span>
+              <span class="text-sub group-open:rotate-180 transition"><svg class="h-5 w-5" fill="none" stroke="currentColor"><path stroke-width="2" d="M6 9l6 6 6-6"/></svg></span>
+            </summary>
+            <pre class="mt-3 font-mono text-sm whitespace-pre-wrap bg-black/30 rounded-2xl p-3 border border-white/10">- Sandboxed evaluator container restricts outbound traffic by default
+- Upgraded runtime to address CVE‑XXXX‑YYYY (no exploits observed)</pre>
+          </details>
+        </article>
+
+        <!-- Older (example) -->
+        <article id="release-2025-06-08" class="cl-entry bg-panel border border-white/10 rounded-3xl p-5 pl-14 relative reveal" data-cl="cli" data-tags="cli export results artifacts">
+          <span aria-hidden="true" class="absolute left-2 top-6 h-4 w-4 rounded-full bg-brand/40"></span>
+          <header class="flex flex-wrap items-center gap-2">
+            <time datetime="2025-06-08" class="text-xs text-sub">June 8, 2025</time>
+            <span class="h-4 w-px bg-white/10"></span>
+            <a href="#release-2025-06-08" class="text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">CLI</a>
+            <span class="h-4 w-px bg-white/10"></span>
+            <span class="badge text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">Fixed</span>
+            <span class="badge text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">CLI</span>
+            <button class="ml-auto cl-copy text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#release-2025-06-08">Copy link</button>
+          </header>
+          <h3 class="mt-2 text-lg font-semibold">CLI: export artifacts reliability</h3>
+          <p class="mt-1 text-sub text-sm">Resolved intermittent export failures on large runs; improved progress output.</p>
+        </article>
+      </div>
+
+      <!-- Load more -->
+      <div class="mt-8 flex items-center justify-center">
+        <button id="clMore" class="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/10 text-sm">Load older releases</button>
+      </div>
+
+      <!-- Bottom links -->
+      <div class="mt-8 flex flex-wrap items-center gap-6 text-sm">
+        <a href="#docs" class="link-underline hover:text-brand-soft">Read the API changelog</a>
+        <span class="h-4 w-px bg-white/10"></span>
+        <a href="#top" class="link-underline hover:text-brand-soft">Back to top ↑</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section scripts -->
+  <script>
+    // ===== Reveal animations
+    (function(){
+      const items = document.querySelectorAll('#changelog .reveal');
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.style.transition = 'transform .6s cubic-bezier(.2,.8,.2,1), opacity .6s ease';
+            e.target.style.opacity = 1;
+            e.target.style.transform = 'translateY(0)';
+            io.unobserve(e.target);
+          }
+        });
+      }, {threshold: 0.12});
+      items.forEach((el,i) => {
+        el.style.opacity = 0; el.style.transform = 'translateY(16px)'; el.style.transitionDelay = (i*70)+'ms'; io.observe(el);
+      });
+    })();
+
+    // ===== Copy link buttons (per entry) + code copy (reuse .docs-copy)
+    (function(){
+      document.querySelectorAll('#changelog .cl-copy').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.target?.replace('#','');
+          if (!id) return;
+          const url = location.origin + location.pathname + '#' + id;
+          navigator.clipboard.writeText(url).then(() => {
+            const old = btn.textContent; btn.textContent = 'Copied!'; setTimeout(()=> btn.textContent = 'Copy link', 900);
+          });
+        });
+      });
+      document.querySelectorAll('#changelog .docs-copy').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = document.querySelector(btn.dataset.target);
+          if (!target) return;
+          const text = target.innerText.replace(/\u00A0/g, ' ');
+          navigator.clipboard.writeText(text).then(() => {
+            const old = btn.textContent; btn.textContent = 'Copied!'; setTimeout(()=> btn.textContent = 'Copy', 900);
+          });
+        });
+      });
+    })();
+
+    // ===== Filters & search
+    (function(){
+      const pills  = document.querySelectorAll('#changelog .cl-pill');
+      const cards  = Array.from(document.querySelectorAll('#clList .cl-entry'));
+      const search = document.getElementById('clSearch');
+      let cat = 'all';
+
+      function apply(){
+        const q = (search.value || '').toLowerCase().trim();
+        cards.forEach(c => {
+          const cats = (c.dataset.cl || '').split(/\s+/);
+          const matchCat = (cat==='all') || cats.includes(cat);
+          const text = ((c.dataset.tags || '') + ' ' + (c.innerText || '')).toLowerCase();
+          const matchTxt = !q || text.includes(q);
+          c.style.display = (matchCat && matchTxt) ? '' : 'none';
+        });
+      }
+
+      pills.forEach(p => p.addEventListener('click', () => {
+        pills.forEach(x => x.setAttribute('aria-selected','false'));
+        p.setAttribute('aria-selected','true');
+        cat = p.dataset.cl;
+        apply();
+      }));
+      search.addEventListener('input', apply);
+      apply();
+    })();
+
+    // ===== Hash deep-link: highlight & focus entry if URL has #release-...
+    (function(){
+      function highlightFromHash(){
+        const id = location.hash.slice(1);
+        if (!id) return;
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('ring-2','ring-brand/50');
+        setTimeout(() => el.classList.remove('ring-2','ring-brand/50'), 1400);
+      }
+      window.addEventListener('hashchange', highlightFromHash);
+      highlightFromHash();
+    })();
+
+    // ===== Load more (demo pagination)
+    (function(){
+      const more = document.getElementById('clMore');
+      let added = false;
+      more.addEventListener('click', () => {
+        if (added) { more.textContent = 'No more releases'; more.disabled = true; return; }
+        const list = document.getElementById('clList');
+        // Example older release (you can duplicate/adjust as needed)
+        const html = `
+<article id="release-2025-05-20" class="cl-entry bg-panel border border-white/10 rounded-3xl p-5 pl-14 relative" data-cl="product" data-tags="rollout controls slider slo">
+  <span aria-hidden="true" class="absolute left-2 top-6 h-4 w-4 rounded-full bg-brand/30"></span>
+  <header class="flex flex-wrap items-center gap-2">
+    <time datetime="2025-05-20" class="text-xs text-sub">May 20, 2025</time>
+    <span class="h-4 w-px bg-white/10"></span>
+    <a href="#release-2025-05-20" class="text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">v1.1.0</a>
+    <span class="h-4 w-px bg-white/10"></span>
+    <span class="badge text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">Improved</span>
+    <span class="badge text-xs rounded-full px-2 py-1 bg-white/10 border border-white/10">Product</span>
+    <button class="ml-auto cl-copy text-xs text-sub hover:text-ink border border-white/10 rounded-md px-2 py-1" data-target="#release-2025-05-20">Copy link</button>
+  </header>
+  <h3 class="mt-2 text-lg font-semibold">Rollout controls upgrade</h3>
+  <p class="mt-1 text-sub text-sm">Smoother percentage slider and segment targeting options in Rollouts.</p>
+</article>`;
+        const temp = document.createElement('div'); temp.innerHTML = html.trim();
+        list.appendChild(temp.firstChild);
+        added = true;
+        more.textContent = 'Loaded';
+        setTimeout(()=> more.textContent = 'Load older releases', 1000);
+      });
+    })();
+  </script>
+</section>
+<!-- ===================== /SECTION 7 ===================== -->
+
+
+  <!-- CTA stub so buttons jump somewhere -->
+<!-- ======================= SECTION 8: FINAL CTA ======================= -->
+<section id="cta" class="relative py-28 overflow-hidden">
+  <!-- Cinematic animated gradient backdrop -->
+  <div aria-hidden="true" class="absolute inset-0 -z-10">
+    <div class="absolute inset-0 opacity-70"
+         style="background:
+           radial-gradient(900px 400px at 80% -10%, rgba(90,124,255,.22), transparent 60%),
+           radial-gradient(700px 350px at 10% 100%, rgba(255,255,255,.08), transparent 60%);">
+    </div>
+    <div class="cta-anim absolute inset-0 opacity-40"></div>
+  </div>
+
+  <!-- Parallax glow -->
+  <div id="ctaGlow" class="parallax-glow absolute -top-24 left-0 w-[700px] h-[700px] rounded-full blur-3xl opacity-35"
+       style="background: radial-gradient(closest-side, rgba(90,124,255,.45), rgba(90,124,255,.12), transparent 70%);"></div>
+
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="grid lg:grid-cols-2 gap-10 items-center">
+      <!-- Left: Copy + proof -->
+      <div class="reveal">
+        <div class="inline-flex items-center text-xs text-sub border border-white/10 rounded-full px-3 py-1 mb-4 bg-panel/60 glass">
+          Get started free
+        </div>
+        <h2 class="text-3xl md:text-5xl font-extrabold leading-tight">
+          Get your API key & ship <span class="text-brand-soft">safer LLM updates</span> this week.
+        </h2>
+        <p class="mt-4 text-sub text-lg max-w-xl">
+          Start with the SDK and golden datasets. Roll out with guardrails when you’re ready.
+        </p>
+
+        <!-- Proof row -->
+        <div class="mt-6 grid sm:grid-cols-3 gap-4">
+          <div class="bg-panel/60 border border-white/10 rounded-2xl p-4 text-center">
+            <div class="text-2xl font-extrabold tabular-nums">31%</div>
+            <div class="text-xs text-sub">↑ task success</div>
+          </div>
+          <div class="bg-panel/60 border border-white/10 rounded-2xl p-4 text-center">
+            <div class="text-2xl font-extrabold tabular-nums">-18%</div>
+            <div class="text-xs text-sub">cost per call</div>
+          </div>
+          <div class="bg-panel/60 border border-white/10 rounded-2xl p-4 text-center">
+            <div class="text-2xl font-extrabold tabular-nums">-27%</div>
+            <div class="text-xs text-sub">latency</div>
+          </div>
+        </div>
+
+        <!-- Logos strip -->
+        <div class="mt-6 overflow-hidden border border-white/10 rounded-2xl bg-panel">
+          <div class="relative">
+            <div class="cta-marquee flex items-center gap-10 py-3 px-6 whitespace-nowrap will-change-transform">
+              <span class="opacity-80">HelioCRM</span>
+              <span class="opacity-80">VectorForge</span>
+              <span class="opacity-80">CoParse</span>
+              <span class="opacity-80">Dataplane</span>
+              <span class="opacity-80">OrbitX</span>
+              <!-- duplicate for seamless loop -->
+              <span class="opacity-80">HelioCRM</span>
+              <span class="opacity-80">VectorForge</span>
+              <span class="opacity-80">CoParse</span>
+              <span class="opacity-80">Dataplane</span>
+              <span class="opacity-80">OrbitX</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Form -->
+      <div class="reveal">
+        <div class="relative bg-panel border border-white/10 rounded-3xl p-6 shadow-2xl overflow-hidden">
+          <!-- Success state overlay -->
+          <div id="ctaSuccess" class="hidden absolute inset-0 bg-panel/95 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
+            <svg class="h-12 w-12 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7l-9 9-5-5"/></svg>
+            <h3 class="text-xl font-semibold">You’re in!</h3>
+            <p class="text-sub text-sm mt-1">Check your email for the verification link. Your API key will be ready in the dashboard.</p>
+            <div class="mt-4 flex items-center gap-3">
+              <a href="#docs" class="rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold shadow-glow">Read Quickstart</a>
+              <a href="#pricing" class="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/10 font-semibold">View Pricing</a>
+            </div>
+          </div>
+
+          <h3 class="text-lg font-semibold">Create your workspace</h3>
+          <p class="text-xs text-sub mt-1">No credit card required • SOC2 Type II • Cancel anytime</p>
+
+          <form id="ctaForm" class="mt-4 space-y-4" novalidate>
+            <!-- spam honeypot -->
+            <input type="text" name="website" class="hidden" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+            <div class="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-sub">Full name</label>
+                <input name="name" type="text" required
+                       class="mt-1 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
+                       placeholder="Alex Kim">
+                <p class="form-err hidden text-[11px] text-[#F87171] mt-1">Please enter your name.</p>
+              </div>
+              <div>
+                <label class="text-xs text-sub">Work email</label>
+                <input name="email" type="email" required
+                       class="mt-1 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
+                       placeholder="alex@company.com">
+                <p class="form-err hidden text-[11px] text-[#F87171] mt-1">Enter a valid email.</p>
+              </div>
+            </div>
+
+            <div class="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-sub">Company</label>
+                <input name="company" type="text" required
+                       class="mt-1 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
+                       placeholder="Acme Inc.">
+                <p class="form-err hidden text-[11px] text-[#F87171] mt-1">Please enter your company.</p>
+              </div>
+              <div>
+                <label class="text-xs text-sub">Use case</label>
+                <select name="usecase" required
+                        class="mt-1 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40">
+                  <option value="">Select…</option>
+                  <option>Support assistant</option>
+                  <option>RAG / knowledge search</option>
+                  <option>Content generation</option>
+                  <option>Agent/automation</option>
+                  <option>Other</option>
+                </select>
+                <p class="form-err hidden text-[11px] text-[#F87171] mt-1">Pick a use case.</p>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <label class="inline-flex items-center gap-2 text-xs text-sub">
+                <input name="consent" type="checkbox" class="accent-brand">
+                I agree to the Terms and Privacy.
+              </label>
+              <a href="#security" class="text-xs link-underline hover:text-brand-soft">Security & DPA</a>
+            </div>
+
+            <!-- Actions -->
+            <div class="mt-2 flex items-center gap-3">
+              <button id="ctaBtn" type="submit"
+                      class="magnet target rounded-2xl px-5 py-3 bg-brand hover:bg-brand/90 font-semibold shadow-glow relative overflow-hidden">
+                <span class="btn-label">Get API Key</span>
+                <span class="btn-spinner hidden absolute inset-0 items-center justify-center">
+                  <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="9" stroke-width="2" opacity=".25"/>
+                    <path d="M21 12a9 9 0 0 1-9 9" stroke-width="2"/>
+                  </svg>
+                </span>
+              </button>
+              <a href="#docs" class="rounded-2xl px-5 py-3 bg-white/10 hover:bg-white/15 border border-white/10 font-semibold">Read Docs</a>
+            </div>
+
+            <p class="text-[11px] text-sub mt-2">By continuing, you agree to our Terms. We’ll only use your email for account creation.</p>
+          </form>
+
+          <!-- FAQ -->
+          <div class="mt-6 border-t border-white/10 pt-4 space-y-2">
+            <details class="group bg-white/5 rounded-xl p-3">
+              <summary class="flex items-center justify-between cursor-pointer list-none">
+                <span class="text-sm font-semibold">Is there a free plan?</span>
+                <span class="text-sub group-open:rotate-180 transition"><svg class="h-5 w-5" fill="none" stroke="currentColor"><path stroke-width="2" d="M6 9l6 6 6-6"/></svg></span>
+              </summary>
+              <p class="mt-2 text-xs text-sub">Yes — includes 5k eval credits/month and 1 seat. No credit card needed.</p>
+            </details>
+            <details class="group bg-white/5 rounded-xl p-3">
+              <summary class="flex items-center justify-between cursor-pointer list-none">
+                <span class="text-sm font-semibold">Can I self‑host?</span>
+                <span class="text-sub group-open:rotate-180 transition"><svg class="h-5 w-5" fill="none" stroke="currentColor"><path stroke-width="2" d="M6 9l6 6 6-6"/></svg></span>
+              </summary>
+              <p class="mt-2 text-xs text-sub">Enterprise offers private networking/VPC and custom data residency; talk to Sales for options.</p>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confetti canvas -->
+  <canvas id="confetti" class="pointer-events-none fixed inset-0 z-50 opacity-0 transition-opacity"></canvas>
+
+  <!-- Section scripts -->
+  <script>
+    // ===== Animated gradient keyframes
+    (function(){
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes CTAshift {
+          0% { background: radial-gradient(1000px 500px at 20% 20%, rgba(90,124,255,.16), transparent 60%); }
+          50%{ background: radial-gradient(900px 450px at 80% 30%, rgba(90,124,255,.22), transparent 60%); }
+          100%{ background: radial-gradient(1000px 500px at 20% 20%, rgba(90,124,255,.16), transparent 60%); }
+        }
+        .cta-anim { animation: CTAshift 14s ease-in-out infinite; }
+      `;
+      document.head.appendChild(style);
+    })();
+
+    // ===== Scroll reveal
+    (function(){
+      const els = document.querySelectorAll('#cta .reveal');
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.style.transition = 'transform .6s cubic-bezier(.2,.8,.2,1), opacity .6s ease';
+            e.target.style.opacity = 1;
+            e.target.style.transform = 'translateY(0)';
+            io.unobserve(e.target);
+          }
+        });
+      }, {threshold: 0.12});
+      els.forEach((el,i) => { el.style.opacity=0; el.style.transform='translateY(16px)'; el.style.transitionDelay=(i*80)+'ms'; io.observe(el); });
+    })();
+
+    // ===== Parallax glow (reuse from hero)
+    (function(){
+      const g = document.getElementById('ctaGlow');
+      window.addEventListener('mousemove', (e) => {
+        const x = (e.clientX / window.innerWidth  - 0.5) * 14;
+        const y = (e.clientY / window.innerHeight - 0.5) * 12;
+        g.style.transform = `translate(${x}px, ${y}px)`;
+      }, { passive: true });
+    })();
+
+    // ===== Marquee
+    (function(){
+      const row = document.querySelector('#cta .cta-marquee');
+      let raf, x = 0, speed = 0.35, paused = false;
+      function loop(){ if (!paused){ x -= speed; if (x < -row.scrollWidth/2) x=0; row.style.transform = \`translateX(\${x}px)\`; } raf=requestAnimationFrame(loop); }
+      row.addEventListener('mouseenter', ()=> paused=true);
+      row.addEventListener('mouseleave', ()=> paused=false);
+      loop();
+    })();
+
+    // ===== Magnetic button
+    (function(){
+      const btn = document.getElementById('ctaBtn');
+      const area = 120; // px
+      function onMove(e){
+        const r = btn.getBoundingClientRect();
+        const x = e.clientX - (r.left + r.width/2);
+        const y = e.clientY - (r.top + r.height/2);
+        const dist = Math.hypot(x,y);
+        if (dist < area) {
+          btn.style.transform = \`translate(\${x*0.15}px,\${y*0.15}px)\`;
+        } else {
+          btn.style.transform = 'translate(0,0)';
+        }
+      }
+      window.addEventListener('mousemove', onMove, { passive:true });
+      btn.addEventListener('mouseleave', ()=> btn.style.transform='translate(0,0)');
+    })();
+
+    // ===== Form validation + async submit + success overlay + confetti
+    (function(){
+      const form = document.getElementById('ctaForm');
+      const btn  = document.getElementById('ctaBtn');
+      const label= btn.querySelector('.btn-label');
+      const spin = btn.querySelector('.btn-spinner');
+      const success = document.getElementById('ctaSuccess');
+
+      function showErr(input, msg){
+        const err = input.parentElement.querySelector('.form-err');
+        if (err) { err.textContent = msg; err.classList.remove('hidden'); }
+        input.style.borderColor = '#F87171';
+      }
+      function clearErr(input){
+        const err = input.parentElement.querySelector('.form-err');
+        if (err) err.classList.add('hidden');
+        input.style.borderColor = 'rgba(255,255,255,.1)';
+      }
+      function validEmail(e){
+        // simple business-ish check
+        const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+        return ok;
+      }
+      form.addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        const data = new FormData(form);
+        // honeypot
+        if (data.get('website')) return;
+
+        const name = form.elements['name'];
+        const email= form.elements['email'];
+        const comp = form.elements['company'];
+        const use  = form.elements['usecase'];
+        const cons = form.elements['consent'];
+
+        let good = true;
+        [name,email,comp,use].forEach(clearErr);
+
+        if (!name.value.trim()) { showErr(name,'Please enter your name.'); good=false; }
+        if (!validEmail(email.value.trim())) { showErr(email,'Enter a valid email.'); good=false; }
+        if (!comp.value.trim()) { showErr(comp,'Please enter your company.'); good=false; }
+        if (!use.value.trim())  { showErr(use,'Pick a use case.'); good=false; }
+        if (!cons.checked) { cons.focus(); good=false; }
+
+        if (!good) return;
+
+        // fake async submit
+        btn.disabled = true;
+        label.classList.add('hidden');
+        spin.classList.remove('hidden');
+        setTimeout(() => {
+          spin.classList.add('hidden');
+          label.classList.remove('hidden');
+          success.classList.remove('hidden');
+          launchConfetti();
+        }, 900);
+      });
+
+      // Inline validation while typing
+      ['input','change','blur'].forEach(evt => {
+        form.addEventListener(evt, (e) => {
+          const t = e.target;
+          if (t.name === 'email') {
+            if (t.value && validEmail(t.value)) clearErr(t);
+          } else if (t.name && t.value) {
+            clearErr(t);
+          }
+        }, true);
+      });
+
+      // Confetti
+      function launchConfetti(){
+        const canvas = document.getElementById('confetti');
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width = window.innerWidth;
+        const H = canvas.height = window.innerHeight;
+        canvas.style.opacity = 1;
+        const pieces = Array.from({length: 140}).map(()=> ({
+          x: Math.random()*W, y: -20 - Math.random()*H*.2,
+          s: 4+Math.random()*4, a: Math.random()*Math.PI*2, v: 1+Math.random()*2
+        }));
+        let t = 0, id;
+        function frame(){
+          ctx.clearRect(0,0,W,H);
+          t += 0.02;
+          pieces.forEach(p=>{
+            p.y += p.v; p.x += Math.sin(t + p.a)*0.8;
+            ctx.save();
+            ctx.translate(p.x,p.y); ctx.rotate(p.a + t);
+            ctx.fillStyle = ['#5A7CFF','#9CB1FF','#E8ECF7','#22C55E'][p.s%4];
+            ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s);
+            ctx.restore();
+          });
+          if (t < 5) id = requestAnimationFrame(frame);
+          else { canvas.style.opacity=0; cancelAnimationFrame(id); }
+        }
+        frame();
+      }
+    })();
+  </script>
+</section>
+<!-- ===================== /SECTION 8 ===================== -->
+
+
+  <!-- ================= Minimal JS ================= -->
+  <script>
+    // ===== Mobile menu
+    const mobBtn  = document.getElementById('mobBtn');
+    const mobMenu = document.getElementById('mobMenu');
+    mobBtn?.addEventListener('click', () => mobMenu.classList.toggle('hidden'));
+
+    // ===== Parallax glow (moves with mouse)
+    const parallax = document.getElementById('parallax');
+    window.addEventListener('mousemove', (e) => {
+      const x = (e.clientX / window.innerWidth  - 0.5) * 12; // intensity
+      const y = (e.clientY / window.innerHeight - 0.5) * 10;
+      parallax.style.transform = `translate(${x}px, ${y}px)`;
+    });
+
+    // ===== Code panes + typewriter animation + copy
+    const tabs  = document.querySelectorAll('[data-tab]');
+    const panePy   = document.getElementById('code_py');
+    const paneJs   = document.getElementById('code_js');
+    const paneCurl = document.getElementById('code_curl');
+    const copyBtn  = document.getElementById('copyCode');
+
+    // Code strings (with light syntax spans)
+    const codePY = String.raw`<span class="token-cm"># Evaluate a prompt & gated rollout</span>
+<span class="token-kw">import</span> neurolaunch <span class="token-kw">as</span> nl
+
+run = nl.<span class="token-fn">eval</span>(
+  dataset=<span class="token-str">"support_tickets_golden"</span>,
+  prompt_version=<span class="token-str">"v18-cot"</span>,
+  model=<span class="token-str">"gpt-4o"</span>,
+  metrics=[<span class="token-str">"task_success"</span>, <span class="token-str">"toxicity"</span>, <span class="token-str">"latency_ms"</span>, <span class="token-str">"cost_usd"</span>]
+)
+
+<span class="token-kw">if</span> run.<span class="token-fn">passes</span>(thresholds={<span class="token-str">"task_success"</span>: <span class="token-num">0.85</span>, <span class="token-str">"toxicity"</span>: <span class="token-num">0.0</span>}):
+    nl.<span class="token-fn">rollout</span>(prompt_version=<span class="token-str">"v18-cot"</span>, to=<span class="token-str">"20%"</span>)
+<span class="token-kw">else</span>:
+    nl.<span class="token-fn">rollback</span>()`;
+
+    const codeJS = String.raw`<span class="token-cm">// Evaluate & gated rollout</span>
+<span class="token-kw">import</span> { evalPrompt, rollout, rollback } <span class="token-kw">from</span> <span class="token-str">'neurolaunch'</span>;
+
+<span class="token-kw">const</span> run = <span class="token-kw">await</span> evalPrompt({
+  dataset: <span class="token-str">"support_tickets_golden"</span>,
+  promptVersion: <span class="token-str">"v18-cot"</span>,
+  model: <span class="token-str">"gpt-4o"</span>,
+  metrics: [<span class="token-str">"task_success"</span>, <span class="token-str">"toxicity"</span>, <span class="token-str">"latency_ms"</span>, <span class="token-str">"cost_usd"</span>]
+});
+
+<span class="token-kw">if</span> (run.passes({ task_success: <span class="token-num">0.85</span>, toxicity: <span class="token-num">0.0</span> })) {
+  <span class="token-kw">await</span> rollout({ promptVersion: <span class="token-str">"v18-cot"</span>, to: <span class="token-str">"20%"</span> });
+} <span class="token-kw">else</span> {
+  <span class="token-kw">await</span> rollback();
+}`;
+
+    const codeCURL = String.raw`<span class="token-cm"># Evaluate & conditionally rollout</span>
+curl -X POST <span class="token-str">'https://api.neurolaunch.ai/eval'</span> \
+ -H <span class="token-str">'Authorization: Bearer $NL_KEY'</span> \
+ -H <span class="token-str">'Content-Type: application/json'</span> \
+ -d <span class="token-str">'{"dataset":"support_tickets_golden","prompt_version":"v18-cot","model":"gpt-4o","metrics":["task_success","toxicity","latency_ms","cost_usd"]}'</span>`;
+
+    // Typewriter effect (for active tab)
+    function typewriter(el, html, speed=10) {
+      el.innerHTML = "";
+      let i = 0;
+      const tick = () => {
+        el.innerHTML = html.slice(0, i++) + '<span class="opacity-50">|</span>';
+        if (i <= html.length) requestAnimationFrame(tick);
+        else el.innerHTML = html; // remove cursor
+      };
+      tick();
+    }
+
+    // Initialize default (Python)
+    typewriter(panePy, codePY);
+
+    // Tab switching with small fade animation
+    function showTab(id) {
+      [panePy, paneJs, paneCurl].forEach(el => el.classList.add('hidden'));
+      tabs.forEach(b => { b.classList.remove('code-tab-active'); b.classList.add('code-tab'); });
+
+      const target = document.getElementById('code_' + id);
+      target.classList.remove('hidden');
+
+      const activeBtn = document.querySelector(`[data-tab="${id}"]`);
+      activeBtn.classList.add('code-tab-active');
+      activeBtn.classList.remove('code-tab');
+
+      // typewriter for the newly shown tab
+      if (id === 'py') typewriter(panePy, codePY);
+      if (id === 'js') typewriter(paneJs, codeJS);
+      if (id === 'curl') typewriter(paneCurl, codeCURL);
+    }
+    tabs.forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+    // Copy current code
+    copyBtn?.addEventListener('click', () => {
+      const active = document.querySelector('pre:not(.hidden)');
+      const text = active.innerText.replace(/\u00A0/g, ' ');
+      navigator.clipboard.writeText(text).then(() => {
+        const original = copyBtn.innerHTML;
+        copyBtn.innerHTML = 'Copied!';
+        setTimeout(() => copyBtn.innerHTML = original, 900);
+      });
+    });
+  </script>
+
+</body>
+<!-- ======================= SECTION 9: FOOTER ======================= -->
+<footer id="footer" class="relative border-t border-white/10 bg-panel/40">
+  <div class="max-w-7xl mx-auto px-6 py-14">
+    <div class="grid lg:grid-cols-[1.2fr_1fr_1fr_1fr_1fr] gap-10">
+      <!-- Brand / Social -->
+      <div>
+
+          <svg viewBox="0 0 48 48" class="h-9 w-9 drop-shadow-[0_0_12px_rgba(90,124,255,0.35)]">
+            <defs>
+              <linearGradient id="logoGFooter" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#5A7CFF"/>
+                <stop offset="100%" stop-color="#C8D5FF"/>
+              </linearGradient>
+            </defs>
+            <rect x="6" y="6" width="36" height="36" rx="9" fill="url(#logoGFooter)"/>
+            <path d="M24 13c6 0 11 5 11 11s-5 11-11 11-11-5-11-11" stroke="#0A0B0D" stroke-width="3" fill="none" />
+          </svg>
+          <span class="text-xl font-extrabold tracking-tight group-hover:text-brand-soft transition">NeuroLaunch</span>
+        </a>
+        <p class="mt-3 text-sub text-sm max-w-sm">
+          Evaluate prompts, A/B in prod, and ship guarded rollouts—so your AI gets better every week.
+        </p>
+
+        <!-- Social -->
+        <div class="mt-5 flex items-center gap-3">
+          <a href="#" aria-label="GitHub"
+             class="inline-flex items-center justify-center h-9 w-9 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.79 23.4c.6.12.82-.26.82-.58v-2.02c-3.34.73-4.04-1.61-4.04-1.61-.55-1.4-1.34-1.77-1.34-1.77-1.09-.74.08-.73.08-.73 1.2.09 1.83 1.23 1.83 1.23 1.07 1.84 2.8 1.31 3.48 1 .11-.78.42-1.31.76-1.61-2.66-.3-5.46-1.33-5.46-5.9 0-1.3.47-2.36 1.24-3.19-.12-.3-.54-1.52.12-3.17 0 0 1.01-.32 3.3 1.22a11.5 11.5 0 0 1 6 0c2.29-1.54 3.3-1.22 3.3-1.22.66 1.65.24 2.87.12 3.17.77.83 1.24 1.89 1.24 3.19 0 4.58-2.81 5.6-5.49 5.9.43.37.82 1.1.82 2.22v3.29c0 .32.21.69.83.58A12 12 0 0 0 12 .5Z"/></svg>
+          </a>
+          <a href="#" aria-label="X / Twitter"
+             class="inline-flex items-center justify-center h-9 w-9 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2H21l-6.51 7.44L22.5 22h-6.79l-4.73-6.51L5.5 22H2.75l6.98-7.98L1.5 2h6.9l4.3 5.98L18.24 2Zm-2.38 18h1.32L7.26 4h-1.3l10 16Z"/></svg>
+          </a>
+          <a href="#" aria-label="LinkedIn"
+             class="inline-flex items-center justify-center h-9 w-9 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1 4.98 2.12 4.98 3.5zM0 8h5v16H0V8zm7.5 0h4.8v2.2h.07c.67-1.27 2.3-2.6 4.73-2.6 5.06 0 6 3.33 6 7.66V24h-5V16.6c0-1.76-.03-4.02-2.45-4.02-2.45 0-2.82 1.9-2.82 3.9V24h-5V8z"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- Product -->
+      <div>
+        <div class="text-sm font-semibold">Product</div>
+        <ul class="mt-3 space-y-2 text-sm">
+          <li><a href="#features" class="link-underline hover:text-brand-soft">Features</a></li>
+          <li><a href="#integrations" class="link-underline hover:text-brand-soft">Integrations</a></li>
+          <li><a href="#pricing" class="link-underline hover:text-brand-soft">Pricing</a></li>
+          <li><a href="#security" class="link-underline hover:text-brand-soft">Security</a></li>
+          <li><a href="#changelog" class="link-underline hover:text-brand-soft">What’s New</a></li>
+        </ul>
+      </div>
+
+      <!-- Developers -->
+      <div>
+        <div class="text-sm font-semibold">Developers</div>
+        <ul class="mt-3 space-y-2 text-sm">
+          <li><a href="#docs-installation" class="link-underline hover:text-brand-soft">Installation</a></li>
+          <li><a href="#docs-sdk" class="link-underline hover:text-brand-soft">SDK</a></li>
+          <li><a href="#docs-quickstart" class="link-underline hover:text-brand-soft">Quickstart</a></li>
+          <li><a href="#docs-cli" class="link-underline hover:text-brand-soft">CLI</a></li>
+          <li><a href="#docs-examples" class="link-underline hover:text-brand-soft">Examples</a></li>
+        </ul>
+      </div>
+
+      <!-- Company -->
+      <div>
+        <div class="text-sm font-semibold">Company</div>
+        <ul class="mt-3 space-y-2 text-sm">
+          <li><a href="#cta" class="link-underline hover:text-brand-soft">Contact</a></li>
+          <li><a href="#cta" class="link-underline hover:text-brand-soft">Request a demo</a></li>
+          <li><a href="#changelog" class="link-underline hover:text-brand-soft">Release notes</a></li>
+        </ul>
+      </div>
+
+      <!-- Newsletter -->
+      <div>
+        <div class="text-sm font-semibold">Stay in the loop</div>
+        <p class="mt-3 text-sub text-sm">Monthly product updates. No spam.</p>
+        <form id="nlForm" class="mt-3 flex gap-2" novalidate>
+          <input id="nlEmail" type="email" placeholder="name@company.com"
+                 class="flex-1 rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40">
+          <button class="rounded-xl px-4 py-2 bg-brand hover:bg-brand/90 font-semibold shadow-glow">Subscribe</button>
+        </form>
+        <p id="nlErr" class="hidden text-[11px] text-[#F87171] mt-2">Please enter a valid work email.</p>
+        <p class="mt-2 text-[11px] text-sub">By subscribing, you agree to our <a href="#footer-legal" class="link-underline">Privacy Policy</a>.</p>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="mt-12 h-px w-full bg-white/10"></div>
+
+    <!-- Legal row -->
+    <div id="footer-legal" class="mt-6 flex flex-col md:flex-row gap-4 md:items-center md:justify-between text-xs text-sub">
+      <div>© <span id="year"></span> NeuroLaunch, Inc. All rights reserved.</div>
+      <div class="flex flex-wrap items-center gap-4">
+        <a href="#" class="hover:text-ink">Privacy</a>
+        <a href="#" class="hover:text-ink">Terms</a>
+        <a href="#security" class="hover:text-ink">Security</a>
+        <a href="#cta" class="hover:text-ink">Contact</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Back-to-top -->
+  <button id="toTop" aria-label="Back to top"
+          class="fixed bottom-6 right-6 rounded-full h-11 w-11 bg-brand text-bg shadow-glow grid place-items-center opacity-0 pointer-events-none transition">
+    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M18 15l-6-6-6 6"/>
+    </svg>
+  </button>
+
+  <!-- Footer scripts -->
+  <script>
+    // Year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Newsletter (inline validation + toast)
+    (function(){
+      const form = document.getElementById('nlForm');
+      const email = document.getElementById('nlEmail');
+      const err = document.getElementById('nlErr');
+
+      function valid(e){ return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(e); }
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const v = (email.value || '').trim();
+        if (!valid(v)) {
+          err.classList.remove('hidden');
+          email.style.borderColor = '#F87171';
+          email.focus();
+          return;
+        }
+        err.classList.add('hidden');
+        email.style.borderColor = 'rgba(255,255,255,.1)';
+        // fake async + toast
+        const t = document.createElement('div');
+        t.className = 'fixed bottom-5 left-1/2 -translate-x-1/2 bg-panel border border-white/10 rounded-xl px-4 py-2 text-xs text-sub shadow-glow';
+        t.textContent = 'Thanks! You’re subscribed.';
+        document.body.appendChild(t);
+        setTimeout(()=> t.remove(), 1400);
+        email.value = '';
+      });
+    })();
+
+    // Back-to-top visibility + smooth scroll (page already has scroll-smooth)
+    (function(){
+      const btn = document.getElementById('toTop');
+      function onScroll(){
+        if (window.scrollY > 400){
+          btn.style.opacity = 1; btn.style.pointerEvents = 'auto';
+        } else {
+          btn.style.opacity = 0; btn.style.pointerEvents = 'none';
+        }
+      }
+      window.addEventListener('scroll', onScroll, { passive:true });
+      onScroll();
+      btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    })();
+  </script>
+</footer>
+<!-- ===================== /SECTION 9 ===================== -->
+
+</html>
